@@ -1,2 +1,12 @@
+# sbt
+.bsp/
+target/
+*/target/
+project/**/target/
+
+# scala / java
 *.class
+
+# misc
 *.log
+
