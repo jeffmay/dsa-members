@@ -10,11 +10,11 @@ object Routes {
   type Reqs = Has[DeployInfo] with Clock
 
   val monitorVersion: HttpApp[Reqs, HttpError] = Http.fromEffectFunction {
-    case Method.GET -> Root / "monitor" / "version" =>
+    case Method.GET → Root / "monitor" / "version" ⇒
       for {
-        deployInfo <- ZIO.service[DeployInfo]
-        clock <- ZIO.service[Clock.Service]
-        now <- clock.instant
+        deployInfo ← ZIO.service[DeployInfo]
+        clock ← ZIO.service[Clock.Service]
+        now ← clock.instant
       } yield Response.jsonString(DeployInfo.toJsonString(deployInfo, now))
   }
 

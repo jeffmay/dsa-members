@@ -26,7 +26,7 @@ object DeployInfo {
       .fromJson[Json.Obj]
       .fold(
         // this should never happen, so I am not even allowing it in the return type
-        msg =>
+        msg ⇒
           throw new IllegalStateException(
             s"sbt-buildinfo plugin produced invalid json: ${BuildInfo.toJson}\nError: $msg",
           ),
@@ -36,10 +36,10 @@ object DeployInfo {
       .copy(fields =
         obj.fields ++
           Map(
-            "deployTime" ->
+            "deployTime" →
               Json.Num(deployInfo.deployedAt.toInstant.toEpochMilli),
-            "deployTimeAsString" -> Json.Str(deployInfo.deployedAt.toString),
-            "aliveSince" -> Json.Str(deployInfo.aliveSince(now)),
+            "deployTimeAsString" → Json.Str(deployInfo.deployedAt.toString),
+            "aliveSince" → Json.Str(deployInfo.aliveSince(now)),
           ),
       )
       .toJsonPretty
