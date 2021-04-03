@@ -9,8 +9,8 @@ import zio.clock.Clock
 object Routes {
   type Reqs = Has[DeployInfo] with Clock
 
-  val monitorVersion: HttpApp[Reqs, HttpError] = Http.fromEffectFunction {
-    case Method.GET → Root / "monitor" / "version" ⇒
+  val monitorVersion: HttpApp[Reqs, HttpError] = Http.collectM[Request] {
+    case Method.GET ==> Root / "monitor" / "version" ⇒
       for {
         deployInfo ← ZIO.service[DeployInfo]
         clock ← ZIO.service[Clock.Service]

@@ -1,90 +1,31 @@
 package org.dsasf.members
 package jobs
 
-import cats.Eq
+import cats.{Eq, Monad}
+import zio.Has.IsHas
 import zio.stream._
-import zio.{Has, IO, UIO, ZIO}
+import zio.{Has, IO, Tag, UIO, URIO, ZIO, ZLayer}
 
 import scala.collection.immutable.ListMap
+import scala.util.Try
 import scala.util.control.NoStackTrace
+import scala.util.matching.Regex
 
 object Csv {
 
-  trait Decode[A] extends DecodeWithHeaderCtx[A] {
-    def decode(row: Row)(implicit ctx: Has[RowCtx]): IO[DecodeFailure, A]
-    override def decodeWithHeader(row: Row)(implicit
-      rowCtx: Has[HeaderCtx] with Has[RowCtx],
-    ): IO[DecodeFailure, A] = decode(row)
+  trait RowDecoder[-R, A] {
+    def decode(row: Row): RowDecoder.Result[R, A]
   }
 
-  final object Decode extends LowPriorityDecodeRowImplicits {
+  final object RowDecoder {
+    type FromPositionOnly[A] = RowDecoder[Any, A]
+    type FromHeaderCtx[A] = RowDecoder[Has[HeaderCtx], A]
+    type MinCtx = Has[RowCtx]
+    type Result[-R, A] = ZIO[R with MinCtx, DecodeFailure, A]
 
-    def apply[A](implicit decoder: Decode[A]): Decode[A] = decoder
-
-    def withContext[A](
-      decoder: Has[RowCtx] ⇒ Row ⇒ IO[DecodeFailure, A],
-    ): Decode[A] = new Decode[A] {
-      final override def decode(row: Row)(implicit
-        rowCtx: Has[RowCtx],
-      ): IO[DecodeFailure, A] = decoder(rowCtx)(row)
-    }
-
-    def withoutContext[A](decoder: Row ⇒ IO[DecodeFailure, A]): Decode[A] =
-      new Decode[A] {
-        final override def decode(row: Row)(implicit
-          rowCtx: Has[RowCtx],
-        ): IO[DecodeFailure, A] = decoder(row)
-      }
-  }
-
-  sealed private[Csv] trait LowPriorityDecodeRowImplicits {
-    implicit def decodeRowWithoutHeader[A : Decode]: DecodeWithHeaderCtx[A] =
-      new DecodeWithHeaderCtx[A] {
-        final override def decodeWithHeader(row: Row)(
-          implicit ctx: Has[HeaderCtx] with Has[RowCtx],
-        ): IO[DecodeFailure, A] =
-          Decode[A].decode(row)
-      }
-  }
-
-  trait DecodeWithHeaderCtx[A] {
-    def decodeWithHeader(row: Row)(implicit
-      ctx: Has[HeaderCtx] with Has[RowCtx],
-    ): IO[DecodeFailure, A]
-  }
-
-  final object DecodeWithHeaderCtx {
-
-    def apply[A](implicit
-      decoder: DecodeWithHeaderCtx[A],
-    ): DecodeWithHeaderCtx[A] = decoder
-
-    def fromEffect[A]: Builder[IO, A] = new Builder(identity)
-
-    def fromEither[A]: Builder[Either, A] = new Builder(IO.fromEither(_))
-
-    final class Builder[M[_, _], A](
-      private val toIO: M[DecodeFailure, A] ⇒ IO[DecodeFailure, A],
-    ) {
-
-      def withContext(
-        decoder: Has[HeaderCtx] with Has[RowCtx] ⇒ Row ⇒ M[DecodeFailure, A],
-      ): DecodeWithHeaderCtx[A] = new DecodeWithHeaderCtx[A] {
-        final override def decodeWithHeader(row: Row)(implicit
-          ctx: Has[HeaderCtx] with Has[RowCtx],
-        ): IO[DecodeFailure, A] =
-          toIO(decoder(ctx)(row))
-      }
-
-      def withoutContext(
-        decoder: Row ⇒ M[DecodeFailure, A],
-      ): DecodeWithHeaderCtx[A] = new DecodeWithHeaderCtx[A] {
-        final override def decodeWithHeader(row: Row)(implicit
-          ctx: Has[HeaderCtx] with Has[RowCtx],
-        ): IO[DecodeFailure, A] =
-          toIO(decoder(row))
-      }
-    }
+    @inline def apply[R, A](implicit
+      decoder: RowDecoder[R, A],
+    ): RowDecoder[R, A] = decoder
   }
 
   final case class HeaderCtx(columns: ListMap[String, Int])
@@ -96,22 +37,22 @@ object Csv {
 
   final case class RowCtx(rowIndex: Long)
 
-  sealed trait Failure extends Exception with NoStackTrace {
+  sealed trait RowFailure extends Exception with NoStackTrace {
     def rowIndex: Long
   }
 
-  sealed abstract class ParseFailure(
+  sealed abstract class RowParsingFailure(
     override val rowIndex: Long,
     val reason: String,
     val cause: Option[Throwable],
   ) extends Exception(s"Parsing failure at row $rowIndex: $reason", cause.orNull)
-    with Failure
+    with RowFailure
 
-  final case class InvalidSyntax(
+  final case class RowInvalidSyntax(
     override val rowIndex: Long,
     syntaxError: String,
     override val cause: Option[Throwable],
-  ) extends ParseFailure(
+  ) extends RowParsingFailure(
       rowIndex,
       s"Invalid CSV row syntax: $syntaxError",
       cause,
@@ -120,8 +61,12 @@ object Csv {
   sealed abstract class DecodeFailure(
     override val rowIndex: Long,
     val reason: String,
-  ) extends Exception(s"Decoding failure at row $rowIndex: $reason")
-    with Failure
+    cause: Option[Throwable],
+  ) extends Exception(
+      s"Decoding failure at row $rowIndex: $reason",
+      cause.orNull,
+    )
+    with RowFailure
 
   final case class InvalidColumnName(
     override val rowIndex: Long,
@@ -129,6 +74,7 @@ object Csv {
   ) extends DecodeFailure(
       rowIndex,
       s"Expected a header column named '$expectedColumnName'",
+      None,
     )
 
   final case class InvalidColumnIndex(
@@ -137,71 +83,263 @@ object Csv {
   ) extends DecodeFailure(
       rowIndex,
       s"Expected a column at index=$expectedColumnIndex",
+      None,
     )
 
-  sealed trait DecodeCellFailure extends DecodeFailure {
+  sealed trait CellDecodingFailure extends DecodeFailure {
     def columnIndex: Int
   }
 
-  final case class UnexpectedType(
+  sealed trait CellDecodingTypedFailure[A] extends CellDecodingFailure {
+    def expectedType: Tag[A]
+    def withNewExpectedType[B : Tag]: CellDecodingTypedFailure[B]
+  }
+
+  final case class CellDecodingException[A : Tag](
     override val rowIndex: Long,
     columnIndex: Int,
-    expectedType: String,
+    cause: Throwable,
   ) extends DecodeFailure(
       rowIndex,
-      s"Expected cell at column=$columnIndex (zero-indexed)" +
-        s" to be of type '$expectedType'",
+      s"Expected cell at column index=$columnIndex to be of type ${Tag[A].tag}. Caused by:\n$cause",
+      Some(cause),
     )
-    with DecodeCellFailure
+    with CellDecodingTypedFailure[A] {
+    override val expectedType: Tag[A] = Tag[A]
+    override def withNewExpectedType[B : Tag]: CellDecodingTypedFailure[B] =
+      copy[B]()
+  }
 
-  object Row {
+  sealed abstract class CellInvalidFormat[A : Tag](
+    rowIndex: Long,
+    columnIndex: Int,
+    patternType: String,
+    expectedPattern: String,
+  ) extends DecodeFailure(
+      rowIndex,
+      s"Expected cell at column index=$columnIndex to match the following $patternType:\n$expectedPattern",
+      None,
+    )
+    with CellDecodingTypedFailure[A] {
+    override val expectedType: Tag[A] = Tag[A]
+  }
+
+  final case class CellInvalidUnmatchedRegex[A : Tag](
+    override val rowIndex: Long,
+    columnIndex: Int,
+    expectedPattern: Regex,
+  ) extends CellInvalidFormat[A](
+      rowIndex,
+      columnIndex,
+      "regular expression",
+      expectedPattern.pattern.pattern,
+    ) {
+    override def withNewExpectedType[B : Tag]: CellDecodingTypedFailure[B] =
+      copy[B]()
+  }
+
+  final object Row {
     implicit val eq: Eq[Row] = Eq.instance(_.cells == _.cells)
 
-    def fromArray(values: Array[String]): Row = new Row(values)
+    // specialized on array to avoid allocation and boxing
+    // this is unsafe because it does not copy the mutable array
+    @inline private[Csv] def unsafeFromArray(values: Array[String]): Row =
+      new Row(values)
+
     def fromIterable(values: Iterable[String]): Row =
       new Row(values.toArray[String])
   }
 
   final class Row private (
-    private val array: Array[String],
+    private val unsafeArray: Array[String],
   ) extends AnyVal {
 
-    def cells: IndexedSeq[String] = array
+    def cells: IndexedSeq[String] = unsafeArray
 
-    def apply(idx: Int)(implicit
-      ctx: Has[RowCtx],
-    ): Either[InvalidColumnIndex, String] =
-      get(idx).toRight(InvalidColumnIndex(ctx.get[RowCtx].rowIndex, idx))
+    def apply(idx: Int): Cell[Has[RowCtx]] = Cell.fromEffect {
+      IO.fromOption {
+        // build an option of our cell
+        Option.when(unsafeArray.isDefinedAt(idx)) {
+          CellCtx(idx, unsafeArray(idx))
+        }
+      }.flatMap { cell ⇒
+        // grab the row context from the surrounding context
+        ZIO.service[RowCtx].map { row ⇒
+          Has.allOf(row, cell)
+        }
+      }.flatMapError { _ ⇒
+        // we need the row context to produce our error as well
+        ZIO.service[RowCtx].map { row ⇒
+          InvalidColumnIndex(row.rowIndex, idx)
+        }
+      }
+    }
 
     def apply(
       key: String,
-    )(implicit
-      ctx: Has[HeaderCtx] with Has[RowCtx],
-    ): Either[DecodeFailure, String] =
+    ): Cell[Has[HeaderCtx] with Has[RowCtx]] = Cell.fromEffect {
       for {
-        colIdx ← ctx.get[HeaderCtx].columns.get(key).toRight(InvalidColumnName(
-          ctx.get[RowCtx].rowIndex,
-          key,
-        ))
-        cell ← apply(colIdx)
-      } yield cell
-
-    def get(idx: Int): Option[String] =
-      Option.when(array.isDefinedAt(idx))(array(idx))
+        // grab the header context so we can look up the column index by name
+        header ← ZIO.service[HeaderCtx]
+        // get the column index or fail
+        colIdx ← IO.succeed(header.columns.get(key)).some.flatMapError { _ ⇒
+          // we need the row context for our error message
+          ZIO.service[RowCtx].map { row ⇒
+            InvalidColumnName(row.rowIndex, key)
+          }
+        }
+        // reuse the logic above to create our underlying
+        cellCtx ← apply(colIdx).underlying
+      } yield cellCtx
+    }
 
   }
 
-  def parse: Parse[Failure, Row] = ParseRows
+  final object Cell {
 
-  def parseAs[A](implicit decoder: Decode[A]): Parse[Failure, A] =
+    def fromEffect[R](result: ZIO[R, DecodeFailure, Has[CellCtx]]): Cell[R] =
+      new Cell(result)
+  }
+
+  final class Cell[R](
+    private[Csv] val underlying: ZIO[R, DecodeFailure, Has[CellCtx]],
+  ) extends AnyVal {
+
+    def colIndex: ZIO[R, DecodeFailure, Int] =
+      underlying.map(_.get[CellCtx].columnIndex)
+
+    // this comes from the surrounding context and not the underlying ZIO, but it is here for convenience
+    def rowIndex: URIO[Has[RowCtx], Long] = ZIO.service[RowCtx].map(_.rowIndex)
+
+    def asString: ZIO[R, DecodeFailure, String] =
+      underlying.map(_.get[CellCtx].content)
+
+    def as[A](implicit
+      decoder: CellDecoder[A],
+    ): ZIO[R with Has[RowCtx], DecodeFailure, A] = {
+      for {
+        ctx ← underlying
+        a ← CellDecoder[A]
+          .decodeCell(ctx.get[CellCtx].content).provideSome[R with Has[RowCtx]] {
+            // provide the resolved cell context as the environment for the decoder
+            // the remaining context must come from outside the cell (i.e. the row context and any header context)
+            _.union(ctx)
+          }
+      } yield a
+    }
+  }
+
+  final case class CellCtx(columnIndex: Int, content: String)
+
+  trait CellDecoder[A] {
+
+    def decodeCell(cell: String): CellDecoder.Result[A]
+
+    def mapSafe[B : Tag](fn: A ⇒ B): CellDecoder[B] =
+      flatMapSafe(a ⇒ CellDecoder.const(fn(a)))
+
+    def flatMapSafe[B : Tag](fn: A ⇒ CellDecoder[B]): CellDecoder[B] =
+      CellDecoder.fromEffect { cell ⇒
+        decodeCell(cell).flatMap { a ⇒
+          ZIO.fromTry(Try(fn(a))).flatMap { decodeB ⇒
+            decodeB.decodeCell(cell)
+          }.flatMapError { ex ⇒
+            for {
+              row ← ZIO.service[RowCtx]
+              cell ← ZIO.service[CellCtx]
+            } yield CellDecodingException[B](
+              row.rowIndex,
+              cell.columnIndex,
+              ex,
+            )
+          }
+        }
+      }
+  }
+
+  final object CellDecoder {
+    type MinCtx = Has[RowCtx] with Has[CellCtx]
+    type Result[A] = ZIO[MinCtx, CellDecodingFailure, A]
+
+    @inline def apply[A](implicit
+      decoder: CellDecoder[A],
+    ): CellDecoder[A] = decoder
+
+    implicit val string: CellDecoder[String] = IO.succeed(_)
+
+    def fromTry[A : Tag](convert: String ⇒ A): CellDecoder[A] = { str ⇒
+      IO.fromTry(Try(convert(str)))
+        .flatMapError { ex ⇒
+          ZIO.services[RowCtx, CellCtx].map { case (row, cell) ⇒
+            CellDecodingException[A](
+              row.rowIndex,
+              cell.columnIndex,
+              ex,
+            )
+          }
+        }
+    }
+
+    def const[A](value: A): CellDecoder[A] = { _ ⇒
+      IO.succeed(value)
+    }
+
+    def fromEffect[A](convert: String ⇒ CellDecoder.Result[A]): CellDecoder[A] =
+      convert(_)
+
+    def fromEither[A](
+      convert: String ⇒ Either[CellDecodingFailure, A],
+    ): CellDecoder[A] = { str ⇒
+      IO.fromEither(convert(str))
+    }
+
+    def matchesRegex(re: Regex): CellDecoder[String] = fromEffect { str ⇒
+      IO.fromOption(Option.when(re.matches(str))(str))
+        .flatMapError { _ ⇒
+          for {
+            row ← ZIO.service[RowCtx]
+            cell ← ZIO.service[CellCtx]
+          } yield CellInvalidUnmatchedRegex[String](
+            row.rowIndex,
+            cell.columnIndex,
+            re,
+          )
+        }
+    }
+
+    def findAllMatches(re: Regex): CellDecoder[Iterable[Regex.Match]] =
+      fromEffect { str ⇒
+        val ll = LazyList.from(re.findAllMatchIn(str))
+        IO.fromOption(Option.unless(ll.isEmpty)(ll))
+          .flatMapError { _ ⇒
+            for {
+              row ← ZIO.service[RowCtx]
+              cell ← ZIO.service[CellCtx]
+            } yield CellInvalidUnmatchedRegex[Iterable[Regex.Match]](
+              row.rowIndex,
+              cell.columnIndex,
+              re,
+            )
+          }
+      }
+  }
+
+  def parse: Parse[RowFailure, Row] = ParseRows
+
+  def parseAs[A](implicit
+    decoder: RowDecoder.FromPositionOnly[A],
+  ): Parse[RowFailure, A] =
     new ParseDecodeNoHeader(decoder)
 
   def parseWithHeaderAs[A](implicit
-    decoder: DecodeWithHeaderCtx[A],
-  ): Parse[Failure, A] =
+    decoder: RowDecoder.FromHeaderCtx[A],
+  ): Parse[RowFailure, A] =
     new ParseDecodeWithHeader(decoder)
 
-  private[Csv] def parseRow(line: String): Row = Row.fromArray(line.split(','))
+  private[Csv] def parseRow(line: String): Row = {
+    // this is safe because the array is unused outside of this local scope
+    Row.unsafeFromArray(line.split(','))
+  }
 
   sealed trait Parse[+E, +A] extends Any {
     def fromLines(lines: UStream[String]): Stream[E, A]
@@ -212,26 +350,25 @@ object Csv {
       lines.map(parseRow)
   }
 
-  sealed trait ParseWithDecoder[D[a] <: Decode[a], A]
-    extends Any with Parse[Failure, A]
+  sealed trait ParseWithDecoder[A] extends Any with Parse[RowFailure, A]
 
   final private class ParseDecodeNoHeader[A] private[Csv] (
-    private val decoder: Decode[A],
+    private val decoder: RowDecoder.FromPositionOnly[A],
   ) extends AnyVal
-    with ParseWithDecoder[Decode, A] {
-    override def fromLines(lines: UStream[String]): Stream[Failure, A] = {
+    with ParseWithDecoder[A] {
+    override def fromLines(lines: UStream[String]): Stream[RowFailure, A] = {
       lines.zipWithIndex.mapM { case (line, idx) ⇒
         val row = parseRow(line)
         val ctx = Has(RowCtx(idx))
-        decoder.decode(row)(ctx)
+        decoder.decode(row).provide(ctx)
       }
     }
   }
 
   final private class ParseDecodeWithHeader[A] private[Csv] (
-    private val decoder: DecodeWithHeaderCtx[A],
+    private val decoder: RowDecoder.FromHeaderCtx[A],
   ) extends AnyVal
-    with ParseWithDecoder[DecodeWithHeaderCtx, A] {
+    with ParseWithDecoder[A] {
 
     private def readHeader(lines: UStream[String]): UIO[Option[(
       UStream[String],
@@ -246,13 +383,13 @@ object Csv {
       }
     }
 
-    override def fromLines(lines: UStream[String]): Stream[Failure, A] = {
+    override def fromLines(lines: UStream[String]): Stream[RowFailure, A] = {
       val maybeResults = readHeader(lines).map {
         case Some((rows, header)) ⇒
           rows.zipWithIndex.map { case (line, idx) ⇒
             val row = parseRow(line)
             val ctx = Has.allOf(header, RowCtx(idx))
-            decoder.decodeWithHeader(row)(ctx)
+            decoder.decode(row).provide(ctx)
           }
         case None ⇒
           ZStream.empty
