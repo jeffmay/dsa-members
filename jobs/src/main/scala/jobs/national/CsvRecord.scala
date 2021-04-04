@@ -12,6 +12,7 @@ import jobs.{national, CommonDecoders, Csv, UnknownEntryOr}
 
 import java.time.LocalDate
 
+// TODO: Handle empty strings at the type-level
 final case class CsvRecord(
   akId: String,
   name: Name,
@@ -20,7 +21,7 @@ final case class CsvRecord(
   mobilePhone: String,
   homePhone: String,
   workPhone: String,
-  emailAddress: EmailAddress,
+  emailAddress: Option[EmailAddress],
   mailPreference: UnknownEntryOr[MailPreference],
   doNotCall: Boolean,
   joinDate: LocalDate,
@@ -90,7 +91,7 @@ object CsvRecord extends CommonDecoders {
       mobilePhone ← row(Keys.MOBILE_PHONE).asString
       homePhone ← row(Keys.HOME_PHONE).asString
       workPhone ← row(Keys.WORK_PHONE).asString
-      emailAddress ← row(Keys.EMAIL).as[EmailAddress]
+      emailAddress ← row(Keys.EMAIL).as[Option[EmailAddress]]
       mailPreference ←
         row(Keys.MAIL_PREFERENCE).as[UnknownEntryOr[MailPreference]]
       doNotCall ← row(Keys.DO_NOT_CALL).as[Boolean]

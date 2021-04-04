@@ -19,12 +19,33 @@ trait CommonDecoders {
   }
 
   implicit val decodeEmailAddress: CellDecoder[EmailAddress] =
-    CellDecoder.fromTry { cell ⇒
+    CellDecoder.fromStringSafe { cell ⇒
+      require(
+        cell.nonEmpty,
+        s"EmailAddress cannot be empty.",
+      )
       val firstAtSymbol = cell.indexOf('@')
-      val (username, domain) = cell.splitAt(firstAtSymbol)
+      require(
+        firstAtSymbol >= 0,
+        s"EmailAddress '$cell' requires an '@' symbol. None found.",
+      )
+      require(
+        firstAtSymbol > 0,
+        s"EmailAddress '$cell' requires a username before the '@' symbol.",
+      )
+      val username = cell.take(firstAtSymbol)
+      require(
+        username.nonEmpty,
+        s"EmailAddress '$cell' username cannot be empty.",
+      )
+      val domain = cell.drop(firstAtSymbol + 1)
+      require(
+        domain.nonEmpty,
+        s"EmailAddress '$cell' domain cannot be empty.",
+      )
       require(
         !domain.contains('@'),
-        "EmailAddress cannot contain multiple '@' symbols",
+        s"EmailAddress domain '$domain' cannot contain an '@' symbol. First symbol found at index $firstAtSymbol.",
       )
       // TODO: Validate domain with regex? Use refined?
       EmailAddress(username, domain)
