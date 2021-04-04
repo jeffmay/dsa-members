@@ -90,7 +90,7 @@ object EnumCodec {
     enum: ValueEnum[V, E],
   ): EnumCodec[E] =
     new EnumCodec[E] {
-      final private[this] val lookupLowerCase =
+      final private[this] lazy val lookupLowerCase =
         enum.valuesToEntriesMap.map { case (k, v) ⇒
           (k.toString.toLowerCase, v)
         }
