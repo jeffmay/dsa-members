@@ -1,9 +1,14 @@
 package org.dsasf.members
 package jobs.national
 
-import database.models.national.MembershipStatus
+import database.models.national.{
+  MailPreference,
+  MembershipStatus,
+  MembershipType,
+  MonthlyDuesStatus,
+}
 import database.models.{Address, EmailAddress, Name}
-import jobs.{national, CommonCsvDecoders, Csv}
+import jobs.{national, CommonDecoders, Csv, UnknownEntryOr}
 
 import java.time.LocalDate
 
@@ -16,16 +21,16 @@ final case class CsvRecord(
   homePhone: String,
   workPhone: String,
   emailAddress: EmailAddress,
-  mailPreference: String, // TODO: Convert to enum
+  mailPreference: UnknownEntryOr[MailPreference],
   doNotCall: Boolean,
   joinDate: LocalDate,
   expiryDate: LocalDate,
-  membershipType: String, // TODO: Convert to enum
-  monthlyDuesStatus: String, // TODO: Convert to enum
-  membershipStatus: MembershipStatus,
+  membershipType: UnknownEntryOr[MembershipType],
+  monthlyDuesStatus: UnknownEntryOr[MonthlyDuesStatus],
+  membershipStatus: UnknownEntryOr[MembershipStatus],
 )
 
-object CsvRecord extends CommonCsvDecoders {
+object CsvRecord extends CommonDecoders {
 
   final object Keys {
     final val AK_ID = "AK_ID"
@@ -86,13 +91,17 @@ object CsvRecord extends CommonCsvDecoders {
       homePhone ← row(Keys.HOME_PHONE).asString
       workPhone ← row(Keys.WORK_PHONE).asString
       emailAddress ← row(Keys.EMAIL).as[EmailAddress]
-      mailPreference ← row(Keys.MAIL_PREFERENCE).asString
+      mailPreference ←
+        row(Keys.MAIL_PREFERENCE).as[UnknownEntryOr[MailPreference]]
       doNotCall ← row(Keys.DO_NOT_CALL).as[Boolean]
       joinDate ← row(Keys.JOIN_DATE).as[LocalDate]
       expiryDate ← row(Keys.EXPIRY_DATE).as[LocalDate]
-      membershipType ← row(Keys.MEMBERSHIP_TYPE).asString
-      monthlyDuesStatus ← row(Keys.MONTHLY_DUES_STATUS).asString
-      membershipStatus ← row(Keys.MEMBERSHIP_STATUS).as[MembershipStatus]
+      membershipType ←
+        row(Keys.MEMBERSHIP_TYPE).as[UnknownEntryOr[MembershipType]]
+      monthlyDuesStatus ←
+        row(Keys.MONTHLY_DUES_STATUS).as[UnknownEntryOr[MonthlyDuesStatus]]
+      membershipStatus ←
+        row(Keys.MEMBERSHIP_STATUS).as[UnknownEntryOr[MembershipStatus]]
     } yield national.CsvRecord(
       akId,
       Name(

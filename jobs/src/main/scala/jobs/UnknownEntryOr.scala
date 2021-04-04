@@ -1,0 +1,46 @@
+package org.dsasf.members
+package jobs
+
+import database.models.{IsEnum, NoSuchMember}
+
+/** A helpful wrapper around an Either from the [[IsEnum]] for when you want to
+  * handle unknown enum value names without losing the ability to throw the
+  * original error.
+  */
+final case class UnknownEntryOr[E](
+  toEither: Either[NoSuchMember, E],
+) extends AnyVal {
+
+  def toUnknownEither: Either[String, E] = toEither.left.map(_.notFoundValue)
+
+  def toUnknownOption: Option[String] =
+    toEither.left.toOption.map(_.notFoundValue)
+
+  def toOption: Option[E] = toEither.toOption
+
+  // TODO: Figure out if the stack trace is helpful here. Should I use scalactic / shapeless Position?
+  @throws[NoSuchMember]("unrecognized enum value name")
+  def toKnownOrThrow: E = toEither.fold(throw _, identity)
+}
+
+object UnknownEntryOr {
+
+  def apply[E : IsEnum]: Builder[E] =
+    new Builder[E](str ⇒ NoSuchMember(IsEnum[E].codec.valueNames, str))
+
+  final class Builder[E](private val buildException: String ⇒ NoSuchMember)
+    extends AnyVal {
+
+    def fromKnown(known: E): UnknownEntryOr[E] = fromEither(Right(known))
+
+    def fromUnknown(unknown: String): UnknownEntryOr[E] =
+      fromEither(Left(unknown))
+
+    def fromEither(originalOrKnown: Either[String, E]): UnknownEntryOr[E] =
+      UnknownEntryOr[E] {
+        originalOrKnown.left.map { str ⇒
+          buildException(str)
+        }
+      }
+  }
+}
