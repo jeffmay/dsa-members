@@ -30,7 +30,7 @@ object Csv {
     ): RowDecoder[R, A] = decoder
   }
 
-  final case class HeaderCtx(columns: ListMap[String, Int])
+  final case class HeaderCtx(columns: Map[String, Int])
   final object HeaderCtx {
     def apply(row: Row): HeaderCtx = apply(row.cells)
     def apply(row: Seq[String]): HeaderCtx =
@@ -84,7 +84,7 @@ object Csv {
     expectedColumnIndex: Int,
   ) extends DecodingFailure(
       rowIndex,
-      s"Expected a column at index=$expectedColumnIndex",
+      s"Expected at least ${expectedColumnIndex + 1} columns",
       None,
     )
 
@@ -119,7 +119,7 @@ object Csv {
     cause: Throwable,
   ) extends DecodingFailure(
       rowIndex,
-      s"Expected cell at column index=$columnIndex to be of type ${Tag[A].tag}. Caused by:\n$cause",
+      s"Expected cell at column ${columnIndex + 1} to be of type ${Tag[A].tag}. Caused by:\n$cause",
       Some(cause),
     )
     with CellDecodingTypedFailure[A] {
@@ -290,7 +290,7 @@ object Csv {
       val validFalse = Set("false", "no", "n", "off", "0")
       val validOptions =
         (validTrue.toSeq ++ validFalse.toSeq).mkString("'", "', '", "'")
-      fromTry { raw ⇒
+      fromStringSafe { raw ⇒
         // skip obviously wrong values
         if (raw.length > "false".length) false
         else {
@@ -304,28 +304,30 @@ object Csv {
       }
     }
 
-    implicit val int: CellDecoder[Int] = fromTry(_.toInt)
-    implicit val long: CellDecoder[Long] = fromTry(_.toLong)
-    implicit val bigInt: CellDecoder[BigInt] = fromTry(BigInt(_))
-    implicit val float: CellDecoder[Float] = fromTry(_.toFloat)
-    implicit val double: CellDecoder[Double] = fromTry(_.toDouble)
-    implicit val bigDecimal: CellDecoder[BigDecimal] = fromTry(BigDecimal(_))
+    implicit val int: CellDecoder[Int] = fromStringSafe(_.toInt)
+    implicit val long: CellDecoder[Long] = fromStringSafe(_.toLong)
+    implicit val bigInt: CellDecoder[BigInt] = fromStringSafe(BigInt(_))
+    implicit val float: CellDecoder[Float] = fromStringSafe(_.toFloat)
+    implicit val double: CellDecoder[Double] = fromStringSafe(_.toDouble)
+    implicit val bigDecimal: CellDecoder[BigDecimal] =
+      fromStringSafe(BigDecimal(_))
 
     // TODO: Come up with more tolerant format options
-    implicit val instant: CellDecoder[Instant] = fromTry(Instant.parse(_))
-    implicit val localDate: CellDecoder[LocalDate] = fromTry(LocalDate.parse(_))
+    implicit val instant: CellDecoder[Instant] = fromStringSafe(Instant.parse(_))
+    implicit val localDate: CellDecoder[LocalDate] =
+      fromStringSafe(LocalDate.parse(_))
     implicit val localDateTime: CellDecoder[LocalDateTime] =
-      fromTry(LocalDateTime.parse(_))
+      fromStringSafe(LocalDateTime.parse(_))
     implicit val zonedDateTime: CellDecoder[ZonedDateTime] =
-      fromTry(ZonedDateTime.parse(_))
+      fromStringSafe(ZonedDateTime.parse(_))
 
     implicit def optional[A : CellDecoder]: CellDecoder[Option[A]] =
       fromEffect { str ⇒
         val trimmed = str.trim
         if (trimmed.isEmpty) {
-          CellDecoder[A].decodeString(trimmed).map(Option(_))
-        } else {
           ZIO.succeed(None)
+        } else {
+          CellDecoder[A].decodeString(trimmed).map(Option(_))
         }
       }
 
@@ -339,8 +341,8 @@ object Csv {
       }
     }
 
-    def fromTry[A : Tag](convert: String ⇒ A): CellDecoder[A] = { str ⇒
-      ZIO.fromTry(Try(convert(str)))
+    def fromStringSafe[A : Tag](convert: String ⇒ A): CellDecoder[A] = { str ⇒
+      ZIO(convert(str))
         .flatMapError { ex ⇒
           ZIO.services[RowCtx, CellCtx].map { case (row, cell) ⇒
             CellDecodingException[A](
@@ -458,9 +460,11 @@ object Csv {
     override def fromLines(lines: UStream[String]): Stream[RowFailure, A] = {
       val maybeResults = readHeader(lines).map {
         case Some((rows, header)) ⇒
+          println(s"HEADER = ${header.columns}")
           rows.zipWithIndex.map { case (line, idx) ⇒
             val row = parseRow(line)
             val ctx = Has.allOf(header, RowCtx(idx))
+            println(s"LINE $idx: $line")
             decoder.decode(row).provide(ctx)
           }
         case None ⇒
