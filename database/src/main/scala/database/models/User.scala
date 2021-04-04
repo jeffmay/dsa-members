@@ -1,5 +1,5 @@
 package org.dsasf.members
-package models
+package database.models
 
 final case class User(
   firstName: String,

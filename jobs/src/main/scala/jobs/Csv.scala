@@ -6,6 +6,7 @@ import zio.Has.IsHas
 import zio.stream._
 import zio.{Has, IO, Tag, UIO, URIO, ZIO, ZLayer}
 
+import java.time.{Instant, LocalDate, LocalDateTime, ZonedDateTime}
 import scala.collection.immutable.ListMap
 import scala.util.Try
 import scala.util.control.NoStackTrace
@@ -90,6 +91,22 @@ object Csv {
     def columnIndex: Int
   }
 
+  final object CellDecodingFailure {
+
+    def fromExceptionDecodingAs[A : Tag](cause: Throwable): URIO[
+      CellDecoder.MinCtx,
+      CellDecodingTypedFailure[A],
+    ] = {
+      ZIO.services[RowCtx, CellCtx].map { case (row, cell) ⇒
+        CellDecodingException[A](
+          row.rowIndex,
+          cell.columnIndex,
+          cause,
+        )
+      }
+    }
+  }
+
   sealed trait CellDecodingTypedFailure[A] extends CellDecodingFailure {
     def expectedType: Tag[A]
     def withNewExpectedType[B : Tag]: CellDecodingTypedFailure[B]
@@ -157,7 +174,7 @@ object Csv {
     def cells: IndexedSeq[String] = unsafeArray
 
     def apply(idx: Int): Cell[Has[RowCtx]] = Cell.fromEffect {
-      IO.fromOption {
+      ZIO.fromOption {
         // build an option of our cell
         Option.when(unsafeArray.isDefinedAt(idx)) {
           CellCtx(idx, unsafeArray(idx))
@@ -267,8 +284,42 @@ object Csv {
 
     implicit val string: CellDecoder[String] = IO.succeed(_)
 
+    implicit val boolean: CellDecoder[Boolean] = {
+      val validTrue = Set("true", "yes", "y", "on", "1")
+      val validFalse = Set("false", "no", "n", "off", "0")
+      val validOptions =
+        (validTrue.toSeq ++ validFalse.toSeq).mkString("'", "', '", "'")
+      fromTry { raw ⇒
+        // skip obviously wrong values
+        if (raw.length > "false".length) false
+        else {
+          val lowercase = raw.trim.toLowerCase
+          if (validTrue.contains(lowercase)) true
+          else if (validFalse.contains(lowercase)) false
+          else throw new IllegalArgumentException(
+            s"Unknown value '$raw'. Expected one of $validOptions",
+          )
+        }
+      }
+    }
+
+    implicit val int: CellDecoder[Int] = fromTry(_.toInt)
+    implicit val long: CellDecoder[Long] = fromTry(_.toLong)
+    implicit val bigInt: CellDecoder[BigInt] = fromTry(BigInt(_))
+    implicit val float: CellDecoder[Float] = fromTry(_.toFloat)
+    implicit val double: CellDecoder[Double] = fromTry(_.toDouble)
+    implicit val bigDecimal: CellDecoder[BigDecimal] = fromTry(BigDecimal(_))
+
+    // TODO: Come up with more tolerant format options
+    implicit val instant: CellDecoder[Instant] = fromTry(Instant.parse(_))
+    implicit val localDate: CellDecoder[LocalDate] = fromTry(LocalDate.parse(_))
+    implicit val localDateTime: CellDecoder[LocalDateTime] =
+      fromTry(LocalDateTime.parse(_))
+    implicit val zonedDateTime: CellDecoder[ZonedDateTime] =
+      fromTry(ZonedDateTime.parse(_))
+
     def fromTry[A : Tag](convert: String ⇒ A): CellDecoder[A] = { str ⇒
-      IO.fromTry(Try(convert(str)))
+      ZIO.fromTry(Try(convert(str)))
         .flatMapError { ex ⇒
           ZIO.services[RowCtx, CellCtx].map { case (row, cell) ⇒
             CellDecodingException[A](
@@ -281,7 +332,7 @@ object Csv {
     }
 
     def const[A](value: A): CellDecoder[A] = { _ ⇒
-      IO.succeed(value)
+      ZIO.succeed(value)
     }
 
     def fromEffect[A](convert: String ⇒ CellDecoder.Result[A]): CellDecoder[A] =
@@ -290,11 +341,11 @@ object Csv {
     def fromEither[A](
       convert: String ⇒ Either[CellDecodingFailure, A],
     ): CellDecoder[A] = { str ⇒
-      IO.fromEither(convert(str))
+      ZIO.fromEither(convert(str))
     }
 
     def matchesRegex(re: Regex): CellDecoder[String] = fromEffect { str ⇒
-      IO.fromOption(Option.when(re.matches(str))(str))
+      ZIO.fromOption(Option.when(re.matches(str))(str))
         .flatMapError { _ ⇒
           for {
             row ← ZIO.service[RowCtx]
@@ -310,7 +361,7 @@ object Csv {
     def findAllMatches(re: Regex): CellDecoder[Iterable[Regex.Match]] =
       fromEffect { str ⇒
         val ll = LazyList.from(re.findAllMatchIn(str))
-        IO.fromOption(Option.unless(ll.isEmpty)(ll))
+        ZIO.fromOption(Option.unless(ll.isEmpty)(ll))
           .flatMapError { _ ⇒
             for {
               row ← ZIO.service[RowCtx]
