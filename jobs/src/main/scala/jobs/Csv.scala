@@ -1,10 +1,11 @@
 package org.dsasf.members
 package jobs
 
-import cats.{Eq, Monad}
-import zio.Has.IsHas
+import database.models.{EnumCodec, IsEnum}
+
+import cats.Eq
 import zio.stream._
-import zio.{Has, IO, Tag, UIO, URIO, ZIO, ZLayer}
+import zio.{Has, IO, Tag, UIO, URIO, ZIO}
 
 import java.time.{Instant, LocalDate, LocalDateTime, ZonedDateTime}
 import scala.collection.immutable.ListMap
@@ -22,7 +23,7 @@ object Csv {
     type FromPositionOnly[A] = RowDecoder[Any, A]
     type FromHeaderCtx[A] = RowDecoder[Has[HeaderCtx], A]
     type MinCtx = Has[RowCtx]
-    type Result[-R, A] = ZIO[R with MinCtx, DecodeFailure, A]
+    type Result[-R, A] = ZIO[R with MinCtx, DecodingFailure, A]
 
     @inline def apply[R, A](implicit
       decoder: RowDecoder[R, A],
@@ -59,7 +60,7 @@ object Csv {
       cause,
     )
 
-  sealed abstract class DecodeFailure(
+  sealed abstract class DecodingFailure(
     override val rowIndex: Long,
     val reason: String,
     cause: Option[Throwable],
@@ -72,7 +73,7 @@ object Csv {
   final case class InvalidColumnName(
     override val rowIndex: Long,
     expectedColumnName: String,
-  ) extends DecodeFailure(
+  ) extends DecodingFailure(
       rowIndex,
       s"Expected a header column named '$expectedColumnName'",
       None,
@@ -81,13 +82,13 @@ object Csv {
   final case class InvalidColumnIndex(
     override val rowIndex: Long,
     expectedColumnIndex: Int,
-  ) extends DecodeFailure(
+  ) extends DecodingFailure(
       rowIndex,
       s"Expected a column at index=$expectedColumnIndex",
       None,
     )
 
-  sealed trait CellDecodingFailure extends DecodeFailure {
+  sealed trait CellDecodingFailure extends DecodingFailure {
     def columnIndex: Int
   }
 
@@ -116,7 +117,7 @@ object Csv {
     override val rowIndex: Long,
     columnIndex: Int,
     cause: Throwable,
-  ) extends DecodeFailure(
+  ) extends DecodingFailure(
       rowIndex,
       s"Expected cell at column index=$columnIndex to be of type ${Tag[A].tag}. Caused by:\n$cause",
       Some(cause),
@@ -132,7 +133,7 @@ object Csv {
     columnIndex: Int,
     patternType: String,
     expectedPattern: String,
-  ) extends DecodeFailure(
+  ) extends DecodingFailure(
       rowIndex,
       s"Expected cell at column index=$columnIndex to match the following $patternType:\n$expectedPattern",
       None,
@@ -214,30 +215,30 @@ object Csv {
 
   final object Cell {
 
-    def fromEffect[R](result: ZIO[R, DecodeFailure, Has[CellCtx]]): Cell[R] =
+    def fromEffect[R](result: ZIO[R, DecodingFailure, Has[CellCtx]]): Cell[R] =
       new Cell(result)
   }
 
   final class Cell[R](
-    private[Csv] val underlying: ZIO[R, DecodeFailure, Has[CellCtx]],
+    private[Csv] val underlying: ZIO[R, DecodingFailure, Has[CellCtx]],
   ) extends AnyVal {
 
-    def colIndex: ZIO[R, DecodeFailure, Int] =
+    def colIndex: ZIO[R, DecodingFailure, Int] =
       underlying.map(_.get[CellCtx].columnIndex)
 
     // this comes from the surrounding context and not the underlying ZIO, but it is here for convenience
     def rowIndex: URIO[Has[RowCtx], Long] = ZIO.service[RowCtx].map(_.rowIndex)
 
-    def asString: ZIO[R, DecodeFailure, String] =
+    def asString: ZIO[R, DecodingFailure, String] =
       underlying.map(_.get[CellCtx].content)
 
     def as[A](implicit
       decoder: CellDecoder[A],
-    ): ZIO[R with Has[RowCtx], DecodeFailure, A] = {
+    ): ZIO[R with Has[RowCtx], DecodingFailure, A] = {
       for {
         ctx ← underlying
         a ← CellDecoder[A]
-          .decodeCell(ctx.get[CellCtx].content).provideSome[R with Has[RowCtx]] {
+          .decodeString(ctx.get[CellCtx].content).provideSome[R with Has[RowCtx]] {
             // provide the resolved cell context as the environment for the decoder
             // the remaining context must come from outside the cell (i.e. the row context and any header context)
             _.union(ctx)
@@ -250,16 +251,16 @@ object Csv {
 
   trait CellDecoder[A] {
 
-    def decodeCell(cell: String): CellDecoder.Result[A]
+    def decodeString(cell: String): CellDecoder.Result[A]
 
     def mapSafe[B : Tag](fn: A ⇒ B): CellDecoder[B] =
       flatMapSafe(a ⇒ CellDecoder.const(fn(a)))
 
     def flatMapSafe[B : Tag](fn: A ⇒ CellDecoder[B]): CellDecoder[B] =
       CellDecoder.fromEffect { cell ⇒
-        decodeCell(cell).flatMap { a ⇒
+        decodeString(cell).flatMap { a ⇒
           ZIO.fromTry(Try(fn(a))).flatMap { decodeB ⇒
-            decodeB.decodeCell(cell)
+            decodeB.decodeString(cell)
           }.flatMapError { ex ⇒
             for {
               row ← ZIO.service[RowCtx]
@@ -317,6 +318,26 @@ object Csv {
       fromTry(LocalDateTime.parse(_))
     implicit val zonedDateTime: CellDecoder[ZonedDateTime] =
       fromTry(ZonedDateTime.parse(_))
+
+    implicit def optional[A : CellDecoder]: CellDecoder[Option[A]] =
+      fromEffect { str ⇒
+        val trimmed = str.trim
+        if (trimmed.isEmpty) {
+          CellDecoder[A].decodeString(trimmed).map(Option(_))
+        } else {
+          ZIO.succeed(None)
+        }
+      }
+
+    /** Does a match on the enum values based on the [[EnumCodec]]
+      */
+    implicit def fromEnum[E : IsEnum : Tag]: CellDecoder[E] = { cell ⇒
+      ZIO.fromEither {
+        IsEnum[E].codec.findByNameInsensitiveEither(cell)
+      }.flatMapError {
+        CellDecodingFailure.fromExceptionDecodingAs[E](_)
+      }
+    }
 
     def fromTry[A : Tag](convert: String ⇒ A): CellDecoder[A] = { str ⇒
       ZIO.fromTry(Try(convert(str)))
