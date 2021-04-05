@@ -52,11 +52,10 @@ final private class ParseDecodeWithHeader[A] private[csv] (
 ) extends AnyVal
   with ParseWithDecoder[A] {
 
-  private def readHeader(lines: UStream[String]): UIO[Option[(
-    UStream[String],
-    HeaderCtx,
-  )]] = {
-    lines.peel(ZSink.head).useNow.map { case (maybeHead, tail) ⇒
+  private def readHeader(
+    lines: UStream[String],
+  ): UIO[Option[(UStream[String], HeaderCtx)]] = {
+    lines.peel(ZSink.head[String]).useNow.map { case (maybeHead, tail) ⇒
       maybeHead.map { firstLine ⇒
         val row = Parse.splitRow(firstLine)
         val header = HeaderCtx(row.cells)
