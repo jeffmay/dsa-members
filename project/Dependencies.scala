@@ -15,6 +15,7 @@ object Dependencies {
   final private val fs2Version = "2.5.3"
   // private final val fs2Version = "3.0.0-M9"
   final private val munitVersion = "0.7.22"
+  final private val scalaCsvVersion = "1.3.7"
   final private val zioVersion = "1.0.5"
   final private val zioConfigVersion = "1.0.2"
   final private val zioHttpVersion = "1.0.0.0-RC13"
@@ -28,6 +29,7 @@ object Dependencies {
   private val doobieCore = "org.tpolecat" %% "doobie-core" % doobieVersion
   private val enumeratum = "com.beachape" %% "enumeratum" % enumeratumVersion
   private val munit = "org.scalameta" %% "munit" % munitVersion
+  private val scalaCsv = "com.github.tototoshi" %% "scala-csv" % scalaCsvVersion
   private val zio = "dev.zio" %% "zio" % zioVersion
   private val zioConfig = "dev.zio" %% "zio-config" % zioConfigVersion
   private val zioConfigMagnolia =
@@ -59,6 +61,27 @@ object Dependencies {
       zioJson,
       zioStreams,
     ),
+  )
+
+  // this does not share common deps because it is intended to be a shared library
+  final val csv = Deps(
+    libraries = Seq(
+      scalaCsv,
+      zio,
+      zioNio,
+    ) ++ Seq(
+      // Test-only dependencies
+      munit,
+    ).map(_ % Test),
+  )
+
+  final val enumeratumOps = Deps(
+    libraries = Seq(
+      enumeratum,
+    ) ++ Seq(
+      // Test-only dependencies
+      munit,
+    ).map(_ % Test),
   )
 
   final val database = Deps(
