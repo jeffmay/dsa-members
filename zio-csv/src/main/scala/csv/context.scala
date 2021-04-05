@@ -1,4 +1,5 @@
-package zio.csv
+package zio
+package csv
 
 final case class HeaderCtx(columns: Map[String, Int])
 object HeaderCtx {

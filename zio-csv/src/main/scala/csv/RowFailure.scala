@@ -1,6 +1,5 @@
-package zio.csv
-
-import zio.{Tag, URIO, ZIO}
+package zio
+package csv
 
 import scala.util.control.NoStackTrace
 import scala.util.matching.Regex

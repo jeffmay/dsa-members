@@ -1,6 +1,5 @@
-package zio.csv
-
-import zio.{Has, ZIO}
+package zio
+package csv
 
 trait RowDecoder[-R, A] {
   def decode(row: Row): RowDecoder.Result[R, A]

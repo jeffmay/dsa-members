@@ -1,7 +1,7 @@
-package zio.csv
+package zio
+package csv
 
-import zio.{Has, UIO}
-import zio.stream.{Stream, UStream, ZSink, ZStream}
+import stream.{Stream, UStream, ZSink, ZStream}
 
 sealed trait Parse[+E, +A] extends Any {
   def fromLines(lines: UStream[String]): Stream[E, A]

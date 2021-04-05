@@ -1,6 +1,5 @@
-package zio.csv
-
-import zio.{Has, ZIO}
+package zio
+package csv
 
 object Row {
   implicit val equiv: Equiv[Row] = Equiv.by(_.cells)
@@ -46,7 +45,7 @@ final class Row private (
       // grab the header context so we can look up the column index by name
       header ← ZIO.service[HeaderCtx]
       // get the column index or fail
-      colIdx ← IO.succeed(header.columns.get(key)).some.flatMapError { _ ⇒
+      colIdx ← ZIO.succeed(header.columns.get(key)).some.flatMapError { _ ⇒
         // we need the row context for our error message
         ZIO.service[RowCtx].map { row ⇒
           InvalidColumnName(row.rowIndex, key)

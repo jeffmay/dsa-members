@@ -1,6 +1,5 @@
-package zio.csv
-
-import zio.{Has, URIO, ZIO}
+package zio
+package csv
 
 object Cell {
 

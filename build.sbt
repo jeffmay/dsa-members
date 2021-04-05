@@ -13,22 +13,22 @@ Global / excludeLintKeys += idePackagePrefix
 def commonLibrary(
   id: String,
   dependencies: Deps,
-  packagePrefix: Option[String],
+  packagePrefix: String,
 ): Project = {
   Project(id, file(id)).settings(
     name := id,
     // Set the package prefix for the IDE, so that we don't have to use deeply nested directories
-    idePackagePrefix := packagePrefix,
+    idePackagePrefix := Some(packagePrefix),
     libraryDependencies ++= dependencies.libraries,
     resolvers ++= dependencies.resolvers,
   )
 }
 
-lazy val csv = commonLibrary("zio-csv", Dependencies.csv, None)
+lazy val csv = commonLibrary("zio-csv", Dependencies.csv, "zio")
   .dependsOn(enumeratumOps)
 
 lazy val enumeratumOps =
-  commonLibrary("enumeratum-ops", Dependencies.enumeratumOps, Some("enumeratum"))
+  commonLibrary("enumeratum-ops", Dependencies.enumeratumOps, "enumeratum")
 
 def commonProject(
   id: String,

@@ -1,7 +1,7 @@
-package zio.csv
+package zio
+package csv
 
 import enumeratum.ops.{EnumCodec, IsEnum}
-import zio.{Has, Tag, ZIO}
 
 import java.time.{Instant, LocalDate, LocalDateTime, ZonedDateTime}
 import scala.util.Try
