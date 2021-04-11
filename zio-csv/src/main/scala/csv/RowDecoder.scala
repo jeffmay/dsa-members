@@ -7,7 +7,15 @@ trait RowDecoder[-R, A] {
 
 object RowDecoder {
   type FromPositionOnly[A] = RowDecoder[Any, A]
-  type FromHeaderCtx[A] = RowDecoder[Has[HeaderCtx], A]
+  final object FromPositionOnly {
+    @inline def apply[A : FromPositionOnly]: FromPositionOnly[A] = implicitly
+  }
+
+  type FromHeaderInfo[A] = RowDecoder[Has[HeaderInfo], A]
+  final object FromHeaderInfo {
+    @inline def apply[A : FromHeaderInfo]: FromHeaderInfo[A] = implicitly
+  }
+
   type MinCtx = Has[RowCtx]
   type Result[-R, A] = ZIO[R with MinCtx, DecodingFailure, A]
 

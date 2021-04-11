@@ -56,9 +56,14 @@ def commonProject(
     )
 
 lazy val api = commonProject("api", Dependencies.api)
-  .dependsOn(database)
+  .dependsOn(
+    database,
+  )
 
 lazy val database = commonProject("database", Dependencies.database)
+  .dependsOn(
+    enumeratumOps,
+  )
 
 lazy val jobs = commonProject("jobs", Dependencies.importer)
   .dependsOn(

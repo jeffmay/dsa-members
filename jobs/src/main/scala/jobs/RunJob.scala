@@ -5,6 +5,9 @@ import jobs.national.ImportNationalMembership
 
 import zio._
 import zio.console.Console
+import zio.csv.CsvFormat
+
+import java.nio.file.Paths
 
 object RunJob extends App {
 
@@ -13,8 +16,16 @@ object RunJob extends App {
       console ← ZIO.service[Console.Service]
 //      _ ← console.putStrLn("Hello. What file do you want to process?")
 //      filename ← console.getStrLn.orDie
-      count ← ImportNationalMembership.fromCSV("tmp/dsasf-2021-03-21.csv").orDie
-      _ ← console.putStrLn(s"Total records parsed: $count")
+      count ← ImportNationalMembership.fromCsvFile(
+        Paths.get(
+          "tmp",
+          "dsasf-2021-03-21.csv",
+        ),
+        CsvFormat.Default,
+      )
+      _ ← console.putStrLn(
+        s"Total successes: ${count.successes}, failures: ${count.failures}",
+      )
     } yield ExitCode.success
   }
 }

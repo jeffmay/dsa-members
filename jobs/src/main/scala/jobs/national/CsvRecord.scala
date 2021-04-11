@@ -8,7 +8,9 @@ import database.models.national.{
   MonthlyDuesStatus,
 }
 import database.models.{Address, EmailAddress, Name}
-import jobs.{national, CommonDecoders, Csv, UnknownEntryOr}
+import jobs.{national, CommonDecoders, UnknownEntryOr}
+
+import zio.csv.RowDecoder
 
 import java.time.LocalDate
 
@@ -69,9 +71,7 @@ object CsvRecord extends CommonDecoders {
     final val DSA_CHAPTER = "DSA_chapter"
   }
 
-  implicit val decodeWithHeaders: Csv.RowDecoder.FromHeaderCtx[
-    CsvRecord,
-  ] = { row ⇒
+  implicit val decodeWithHeaders: RowDecoder.FromHeaderInfo[CsvRecord] = { row ⇒
     for {
       akId ← row(Keys.AK_ID).asString
       firstName ← row(Keys.FIRST_NAME).asString

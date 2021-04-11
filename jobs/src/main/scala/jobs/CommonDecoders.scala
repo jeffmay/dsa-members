@@ -1,21 +1,23 @@
 package org.dsasf.members
 package jobs
 
-import database.models.{EmailAddress, IsEnum}
-import jobs.Csv.CellDecoder
+import database.models.EmailAddress
+
+import enumeratum.ops.EnumCodec
+import zio.csv.CellDecoder
 
 trait CommonDecoders {
 
   implicit def decodeUnknownEntryOr[
-    E : IsEnum : CellDecoder,
+    E : EnumCodec,
   ]: CellDecoder[
     UnknownEntryOr[E],
-  ] = CellDecoder.fromEffect { str ⇒
-    CellDecoder[E].decodeString(str)
-      .fold(
-        _ ⇒ UnknownEntryOr[E].fromUnknown(str),
-        UnknownEntryOr[E].fromKnown,
-      )
+  ] = CellDecoder.fromStringTotal { str ⇒
+    EnumCodec[E].findByNameInsensitiveOpt(str).map { entry ⇒
+      UnknownEntryOr[E].fromKnown(entry)
+    }.getOrElse {
+      UnknownEntryOr[E].fromUnknown(str)
+    }
   }
 
   implicit val decodeEmailAddress: CellDecoder[EmailAddress] =

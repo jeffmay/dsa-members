@@ -3,6 +3,13 @@ package ops
 
 import values.{ValueEnum, ValueEnumEntry}
 
+import scala.annotation.implicitNotFound
+
+/** Defines generic operations for extracting and serializing enum values to and from strings.
+  *
+  * Also defines the complete list of possible values for error messages.
+  */
+@implicitNotFound("Cannot find implicit EnumCodec[${E}]. Does the companion object extend EnumCompanion[${E}]?")
 trait EnumCodec[E] {
 
   /** The list of all possible enum values

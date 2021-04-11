@@ -4,7 +4,18 @@ package csv
 import scala.util.control.NoStackTrace
 import scala.util.matching.Regex
 
-sealed trait RowFailure extends Exception with NoStackTrace {
+sealed trait ReadingFailure extends Exception with NoStackTrace
+
+sealed trait ParsingFailure extends ReadingFailure
+
+final case class ParsingException(cause: Throwable)
+  extends Exception(
+    s"Parsing failed due to exception: $cause",
+    cause,
+  )
+  with ParsingFailure
+
+sealed trait RowFailure extends ReadingFailure {
   def rowIndex: Long
 }
 
@@ -14,6 +25,7 @@ sealed abstract class RowParsingFailure(
   val cause: Option[Throwable],
 ) extends Exception(s"Parsing failure at row $rowIndex: $reason", cause.orNull)
   with RowFailure
+  with ParsingFailure
 
 final case class RowInvalidSyntax(
   override val rowIndex: Long,

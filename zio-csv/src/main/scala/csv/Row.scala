@@ -2,28 +2,20 @@ package zio
 package csv
 
 object Row {
-  implicit val equiv: Equiv[Row] = Equiv.by(_.cells)
-
-  // specialized on array to avoid allocation and boxing
-  // this is unsafe because it does not copy the mutable array
-  @inline private[csv] def unsafeFromArray(values: Array[String]): Row =
-    new Row(values)
-
   def fromIterable(values: Iterable[String]): Row =
     new Row(values.toArray[String])
 }
 
+// TODO: Allow passing the RowCtx somehow... maybe subclasses with different environment requirements?
 final class Row private (
-  private val unsafeArray: Array[String],
+  val cells: IndexedSeq[String],
 ) extends AnyVal {
-
-  def cells: IndexedSeq[String] = unsafeArray
 
   def apply(idx: Int): Cell[Has[RowCtx]] = Cell.fromEffect {
     ZIO.fromOption {
       // build an option of our cell
-      Option.when(unsafeArray.isDefinedAt(idx)) {
-        CellCtx(idx, unsafeArray(idx))
+      Option.when(cells.isDefinedAt(idx)) {
+        CellCtx(idx, cells(idx))
       }
     }.flatMap { cell ⇒
       // grab the row context from the surrounding context
@@ -40,10 +32,10 @@ final class Row private (
 
   def apply(
     key: String,
-  ): Cell[Has[HeaderCtx] with Has[RowCtx]] = Cell.fromEffect {
+  ): Cell[Has[HeaderInfo] with Has[RowCtx]] = Cell.fromEffect {
     for {
       // grab the header context so we can look up the column index by name
-      header ← ZIO.service[HeaderCtx]
+      header ← ZIO.service[HeaderInfo]
       // get the column index or fail
       colIdx ← ZIO.succeed(header.columns.get(key)).some.flatMapError { _ ⇒
         // we need the row context for our error message

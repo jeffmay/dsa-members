@@ -1,7 +1,7 @@
 package org.dsasf.members
 package jobs
 
-import database.models.{IsEnum, NoSuchMember}
+import enumeratum.ops.{EnumCodec, NoSuchMember}
 
 /** A helpful wrapper around an Either from the [[IsEnum]] for when you want to
   * handle unknown enum value names without losing the ability to throw the
@@ -25,8 +25,8 @@ final case class UnknownEntryOr[E](
 
 object UnknownEntryOr {
 
-  def apply[E : IsEnum]: Builder[E] =
-    new Builder[E](str ⇒ NoSuchMember(IsEnum[E].codec.valueNames, str))
+  def apply[E : EnumCodec]: Builder[E] =
+    new Builder[E](str ⇒ NoSuchMember(EnumCodec[E].valueNames, str))
 
   final class Builder[E](private val buildException: String ⇒ NoSuchMember)
     extends AnyVal {
