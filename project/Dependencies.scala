@@ -7,8 +7,8 @@ case class Deps(
 
 object Dependencies {
 
-//  private final val catsVersion = "2.4.2"
-//  private final val catsEffectVersion = "2.3.3"
+  final private val catsVersion = "2.5.0"
+  //  private final val catsEffectVersion = "2.3.3"
   // private final val catsEffectVersion = "3.0.0-RC2"
   final private val doobieVersion = "0.12.1"
   final private val enumeratumVersion = "1.6.1"
@@ -17,6 +17,7 @@ object Dependencies {
   final private val munitVersion = "0.7.22"
   final private val scalaCsvVersion = "1.3.7"
   final private val zioVersion = "1.0.5"
+  final private val zioCatsVersion = "2.4.0.0"
   final private val zioConfigVersion = "1.0.2"
   final private val zioHttpVersion = "1.0.0.0-RC13"
   final private val zioJsonVersion = "0.1.3"
@@ -24,13 +25,14 @@ object Dependencies {
   final private val zioNioVersion = "1.0.0-RC10"
 
   private val fs2Core = "co.fs2" %% "fs2-core" % fs2Version
-//  private val catsCore = "org.typelevel" %% "cats-core" % catsVersion
-//  private val catsEffect = "org.typelevel" %% "cats-effect" % catsEffectVersion
+  private val catsCore = "org.typelevel" %% "cats-core" % catsVersion
+  //  private val catsEffect = "org.typelevel" %% "cats-effect" % catsEffectVersion
   private val doobieCore = "org.tpolecat" %% "doobie-core" % doobieVersion
   private val enumeratum = "com.beachape" %% "enumeratum" % enumeratumVersion
   private val munit = "org.scalameta" %% "munit" % munitVersion
   private val scalaCsv = "com.github.tototoshi" %% "scala-csv" % scalaCsvVersion
   private val zio = "dev.zio" %% "zio" % zioVersion
+  private val zioCats = "dev.zio" %% "zio-interop-cats" % zioCatsVersion
   private val zioConfig = "dev.zio" %% "zio-config" % zioConfigVersion
   private val zioConfigMagnolia =
     "dev.zio" %% "zio-config-magnolia" % zioConfigVersion
@@ -66,8 +68,10 @@ object Dependencies {
   // this does not share common deps because it is intended to be a shared library
   final val csv = Deps(
     libraries = Seq(
+      catsCore,
       scalaCsv,
       zio,
+      zioCats,
       zioNio,
     ) ++ Seq(
       // Test-only dependencies
