@@ -11,13 +11,19 @@ object RowDecoder {
     @inline def apply[A : FromPositionOnly]: FromPositionOnly[A] = implicitly
   }
 
-  type FromHeaderInfo[A] = RowDecoder[Has[HeaderInfo], A]
+  type FromHeaderInfo[A] = RowDecoder[Has[HeaderCtx], A]
   final object FromHeaderInfo {
     @inline def apply[A : FromHeaderInfo]: FromHeaderInfo[A] = implicitly
   }
 
-  type MinCtx = Has[RowCtx]
-  type Result[-R, A] = ZIO[R with MinCtx, DecodingFailure, A]
+  implicit class FromHeaderOps[A](private val decoder: FromHeaderInfo[A])
+    extends AnyVal {
+    def withFixedHeader(header: HeaderCtx): FromPositionOnly[A] = { row ⇒
+      decoder.decode(row).provide(Has(header))
+    }
+  }
+
+  type Result[-R, A] = ZIO[R, DecodingFailure, A]
 
   @inline def apply[R, A](implicit
     decoder: RowDecoder[R, A],

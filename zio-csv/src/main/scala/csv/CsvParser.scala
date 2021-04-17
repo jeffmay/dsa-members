@@ -24,7 +24,7 @@ object CsvParser {
       .zipWithIndex
       .mapM { case (line, index) ⇒
         ZIO.fromEither {
-          parser.parseLine(line).map(Row.fromIterable).toRight {
+          parser.parseLine(line).map(Row(index, _)).toRight {
             RowInvalidSyntax(index, s"Malformed Input: $line", None)
           }
         }

@@ -85,6 +85,13 @@ object CellDecodingFailure {
   }
 }
 
+final case class GenericCellDecodingFailure(
+  override val rowIndex: Long,
+  columnIndex: Int,
+  override val reason: String,
+) extends DecodingFailure(rowIndex, reason, None)
+  with CellDecodingFailure
+
 sealed trait CellDecodingTypedFailure[A] extends CellDecodingFailure {
   def expectedType: Tag[A]
   def withNewExpectedType[B : Tag]: CellDecodingTypedFailure[B]

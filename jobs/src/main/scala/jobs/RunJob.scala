@@ -1,19 +1,29 @@
 package org.dsasf.members
 package jobs
 
-import jobs.national.ImportNationalMembership
-
+import org.dsasf.members.jobs.national.ImportNationalMembership
 import zio._
-import zio.console.Console
 import zio.csv.CsvFormat
+import zio.stream.{ZStream, ZTransducer}
 
-import java.nio.file.Paths
+import java.nio.file.{Path, Paths}
 
 object RunJob extends App {
 
+  private val sampleFile: Path = Paths.get("tmp", "dsasf-2021-03-21.csv")
+
   override def run(args: List[String]): URIO[ZEnv, ExitCode] = {
+//    val linesOfFile = ZStream.fromFile(sampleFile).transduce(
+//      ZTransducer.utfDecode >>> ZTransducer.splitLines,
+//    )
+//    val printAll = for ((line, idx) ← linesOfFile.zipWithIndex)
+//      console.putStrLn(s"Line ${idx + 1}: $line")
+
+//    for {
+//      _ ← printAll.orDie
+//    } yield ExitCode.success
     for {
-      console ← ZIO.service[Console.Service]
+//      console ← ZIO.service[Console.Service]
 //      _ ← console.putStrLn("Hello. What file do you want to process?")
 //      filename ← console.getStrLn.orDie
       count ← ImportNationalMembership.fromCsvFile(

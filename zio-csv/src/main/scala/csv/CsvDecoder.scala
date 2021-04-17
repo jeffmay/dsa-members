@@ -5,69 +5,63 @@ import stream.{ZSink, ZStream}
 
 object CsvDecoder {
 
-  /** Peels off the header row(s) and returns the [[HeaderInfo]] as well as
+  /** Peels off the header row(s) and returns the [[HeaderCtx]] as well as
     * another stream containing the rest of the rows of data.
     */
   def readHeaderInfo[R, E >: RowFailure](
     rows: ZStream[R, E, Row],
-  ): ZIO[R, E, Option[(HeaderInfo, ZStream[R, E, Row])]] = {
+  ): ZIO[R, E, Option[(HeaderCtx, ZStream[R, E, Row])]] = {
     rows.peel(ZSink.head[Row]).useNow.map { case (maybeHead, tail) ⇒
       maybeHead.map { firstRow ⇒
-        val header = HeaderInfo.fromRow(firstRow)
+        val header = HeaderCtx.fromRow(firstRow)
         (header, tail)
       }
     }
   }
 
-  def decodeRowsAs[A]: CsvDecoder[Any, A] = new DecodeAllNoHeader
-
-  def decodeRowsUsingHeaderInfoAs[A]: CsvDecoder[Has[HeaderInfo], A] =
-    new DecodeAllWithHeader
+  def decodeRowsAs[A]: DecodeRowsAs[A] = new DecodeRowsAs
 }
 
-sealed trait CsvDecoder[H, A] extends Any {
-  def apply[R, E1 >: RowFailure <: Throwable](
-    rows: ZStream[R, E1, Row],
-  )(implicit
-    decoder: RowDecoder[H, A],
-  ): ZStream[R, E1, A]
-}
-
-final private class DecodeAllNoHeader[A] private[csv] (
+final class DecodeRowsAs[A] private[csv] (
   private val dummy: Boolean = true,
-) extends AnyVal
-  with CsvDecoder[Any, A] {
+) extends AnyVal {
 
-  override def apply[R, E1 >: RowFailure](
-    rows: ZStream[R, E1, Row],
-  )(implicit decoder: RowDecoder.FromPositionOnly[A]): ZStream[R, E1, A] = {
-    rows.zipWithIndex.mapM { case (row, idx) ⇒
-      val ctx = Has(RowCtx(idx))
-      decoder.decode(row).provide(ctx)
+  def usingPositionOnly[R, E >: RowFailure](
+    rows: ZStream[R, E, Row],
+  )(implicit decoder: RowDecoder.FromPositionOnly[A]): ZStream[R, E, A] = {
+    rows.mapM { row ⇒
+      decoder.decode(row)
     }
   }
-}
 
-final private class DecodeAllWithHeader[A] private[csv] (
-  private val dummy: Boolean = true,
-) extends AnyVal
-  with CsvDecoder[Has[HeaderInfo], A] {
-
-  override def apply[R, E1 >: RowFailure <: Throwable](
-    rows: ZStream[R, E1, Row],
-  )(implicit decoder: RowDecoder.FromHeaderInfo[A]): ZStream[R, E1, A] = {
+  def usingHeaderInfo[R, E >: RowFailure <: Throwable](
+    rows: ZStream[R, E, Row],
+  )(implicit decoder: RowDecoder.FromHeaderInfo[A]): ZStream[R, E, A] = {
     val maybeResults = CsvDecoder.readHeaderInfo(rows).orDie.map {
       case Some((header, dataRows)) ⇒
         println(s"HEADER = ${header.columns}")
-        dataRows.zipWithIndex.map { case (row, idx) ⇒
-          val ctx = Has.allOf(header, RowCtx(idx))
-          println(s"LINE $idx: ${row.cells}")
-          decoder.decode(row).provide(ctx)
+        dataRows.map { row ⇒
+          val env = Has.allOf(header, row.ctx)
+          println(s"LINE ${row.rowIndex}: ${row.cells}")
+          decoder.decode(row).provide(env).map { record ⇒
+            println(s"Parsed Record: $record")
+            record
+          }
         }
       case None ⇒
         ZStream.empty
     }
-    ZStream.fromEffectOption(maybeResults).flatten.mapM(identity)
+    val z = ZStream.fromEffect(maybeResults)
+    val a = z.flatten
+    a.mapM(identity)
   }
 
+  def providedHeader[R, E >: RowFailure](
+    header: HeaderCtx,
+    dataRows: ZStream[R, E, Row],
+  )(implicit
+    decoder: RowDecoder.FromHeaderInfo[A],
+  ): ZStream[R, E, A] = {
+    usingPositionOnly(dataRows)(decoder.withFixedHeader(header))
+  }
 }

@@ -1,6 +1,8 @@
 package zio
 package csv
 
+import csv.CellDecoder.MinCtx
+
 import enumeratum.ops.EnumCodec
 
 import java.time.{Instant, LocalDate, LocalDateTime, ZonedDateTime}
@@ -9,11 +11,16 @@ import scala.util.matching.Regex
 
 trait CellDecoder[A] {
 
-  def decodeString(cell: String): CellDecoder.Result[A]
+  def decodeString(content: String): ZIO[MinCtx, CellDecodingFailure, A]
+
+  def or[B >: A](decoder: ⇒ CellDecoder[B]): CellDecoder[B] =
+    CellDecoder.fromEffect { content ⇒
+      decodeString(content).orElse(decoder.decodeString(content))
+    }
 
   def mapSafe[B : Tag](fn: A ⇒ B): CellDecoder[B] =
-    CellDecoder.fromEffect { cell ⇒
-      decodeString(cell).flatMap { a ⇒
+    CellDecoder.fromEffect { content ⇒
+      decodeString(content).flatMap { a ⇒
         ZIO.fromTry(Try(fn(a))).flatMapError { ex ⇒
           ZIO.services[RowCtx, CellCtx].map { case (row, cell) ⇒
             CellDecodingException[B](
@@ -27,10 +34,10 @@ trait CellDecoder[A] {
     }
 
   def flatMapSafe[B : Tag](fn: A ⇒ CellDecoder[B]): CellDecoder[B] =
-    CellDecoder.fromEffect { cell ⇒
-      decodeString(cell).flatMap { a ⇒
+    CellDecoder.fromEffect { content ⇒
+      decodeString(content).flatMap { a ⇒
         ZIO.fromTry(Try(fn(a))).flatMap { decodeB ⇒
-          decodeB.decodeString(cell)
+          decodeB.decodeString(content)
         }.flatMapError { ex ⇒
           ZIO.services[RowCtx, CellCtx].map { case (row, cell) ⇒
             CellDecodingException[B](
@@ -110,6 +117,38 @@ object CellDecoder {
     }
   }
 
+  def const[A](value: A): CellDecoder[A] = { _ ⇒
+    ZIO.succeed(value)
+  }
+
+  def fail[A](failure: URIO[
+    CellDecoder.MinCtx,
+    CellDecodingFailure,
+  ]): CellDecoder[A] =
+    failWith(_ ⇒ failure)
+
+  def failWith[A](failWith: String ⇒ URIO[
+    CellDecoder.MinCtx,
+    CellDecodingFailure,
+  ]): CellDecoder[A] =
+    content ⇒ {
+      for {
+        failure ← failWith(content)
+        failed ← ZIO.fail(failure)
+      } yield failed
+    }
+
+  def failWithMessage[A](reason: String): CellDecoder[A] =
+    failWith[A] { _ ⇒
+      ZIO.services[RowCtx, CellCtx].map { case (row, cell) ⇒
+        GenericCellDecodingFailure(
+          row.rowIndex,
+          cell.columnIndex,
+          reason,
+        )
+      }
+    }
+
   def fromStringSafe[A : Tag](convert: String ⇒ A): CellDecoder[A] = { str ⇒
     ZIO(convert(str))
       .flatMapError { ex ⇒
@@ -125,10 +164,6 @@ object CellDecoder {
 
   def fromStringTotal[A](convert: String ⇒ A): CellDecoder[A] =
     str ⇒ ZIO.succeed(convert(str))
-
-  def const[A](value: A): CellDecoder[A] = { _ ⇒
-    ZIO.succeed(value)
-  }
 
   def fromEffect[A](convert: String ⇒ CellDecoder.Result[A]): CellDecoder[A] =
     convert(_)
