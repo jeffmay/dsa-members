@@ -41,7 +41,7 @@ final class DecodeRowsAs[A] private[csv] (
       case Some((header, dataRows)) ⇒
         println(s"HEADER = ${header.columns}")
         dataRows.map { row ⇒
-          val env = Has.allOf(header, row.ctx)
+          val env = Has.allOf(header, row.rowContext)
           println(s"LINE ${row.rowIndex}: ${row.cells}")
           decoder.decode(row).provide(env).map { record ⇒
             println(s"Parsed Record: $record")
