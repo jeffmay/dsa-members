@@ -7,6 +7,7 @@ import enumeratum.ops.EnumCodec
 
 import java.time.{Instant, LocalDate, LocalDateTime, ZonedDateTime}
 import scala.collection.Factory
+import scala.collection.immutable.ArraySeq
 import scala.util.Try
 import scala.util.matching.Regex
 
@@ -116,8 +117,7 @@ object CellDecoder {
     decoder: CellDecoder[A],
   ): CellDecoder[A] = decoder
 
-  def split(delimiter: Char): SplitString =
-    new SplitString(_.split(delimiter).toIndexedSeq)
+  def split(delimiter: Char): SplitString = new SplitString(_.split(delimiter))
 
   def split(re: Regex): SplitString = new SplitString(re.split)
 
@@ -130,11 +130,15 @@ object CellDecoder {
     }
   }
 
-  final class SplitString(private val splitString: String => IndexedSeq[String])
+  final class SplitString(private val splitString: String => Array[String])
     extends Split[String] {
 
     override protected val split: String => CellDecoder.Result[IndexedSeq[String]] = {
-      val decoder = CellDecoder.fromStringSafe(splitString)
+      // this is safe because the array is never mutated in this local scope
+      // and all other references are to an immutable interface that copies
+      // to a new array before allowing mutation.
+      val decoder =
+        CellDecoder.fromStringSafe(s => ArraySeq.unsafeWrapArray(splitString(s)))
       decoder.decodeString
     }
 

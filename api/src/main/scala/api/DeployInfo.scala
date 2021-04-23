@@ -12,7 +12,7 @@ final case class DeployInfo(deployedAt: OffsetDateTime) {
   def aliveSince(now: Instant): String = {
     val duration = (now.getEpochSecond - deployedAt.toEpochSecond).seconds
     val coarsest = duration.toCoarsest
-    s"${coarsest} ago"
+    s"$coarsest ago"
   }
 
   def aliveSinceDefaultTimeZone(): String = aliveSince(Instant.now())
