@@ -10,8 +10,8 @@ object CsvDecoder {
     */
   def readHeaderInfo[R, E >: RowFailure](
     rows: ZStream[R, E, Row],
-  ): ZIO[R, E, Option[(HeaderCtx, ZStream[R, E, Row])]] = {
-    rows.peel(ZSink.head[Row]).useNow.map { case (maybeHead, tail) ⇒
+  ): ZManaged[R, E, Option[(HeaderCtx, ZStream[R, E, Row])]] = {
+    rows.peel(ZSink.head[Row]).map { case (maybeHead, tail) ⇒
       maybeHead.map { firstRow ⇒
         val header = HeaderCtx.fromRow(firstRow)
         (header, tail)
@@ -37,23 +37,17 @@ final class DecodeRowsAs[A] private[csv] (
   def usingHeaderInfo[R, E >: RowFailure <: Throwable](
     rows: ZStream[R, E, Row],
   )(implicit decoder: RowDecoder.FromHeaderInfo[A]): ZStream[R, E, A] = {
-    val maybeResults = CsvDecoder.readHeaderInfo(rows).orDie.map {
+    val readHeaderThenAllRows = CsvDecoder.readHeaderInfo(rows).map {
       case Some((header, dataRows)) ⇒
-        println(s"HEADER = ${header.columns}")
-        dataRows.map { row ⇒
+        dataRows.mapM { row ⇒
           val env = Has.allOf(header, row.rowContext)
-          println(s"LINE ${row.rowIndex}: ${row.cells}")
-          decoder.decode(row).provide(env).map { record ⇒
-            println(s"Parsed Record: $record")
-            record
-          }
+          decoder.decode(row).provide(env)
         }
       case None ⇒
         ZStream.empty
     }
-    val z = ZStream.fromEffect(maybeResults)
-    val a = z.flatten
-    a.mapM(identity)
+    // flatten the ZManaged ZStream into a single ZStream
+    ZStream.managed(readHeaderThenAllRows).flatten
   }
 
   def providedHeader[R, E >: RowFailure](

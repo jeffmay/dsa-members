@@ -33,10 +33,11 @@ object ImportNationalMembership {
   ): URIO[Blocking, ImportResults] = {
     val reader = CsvParser.fromFile(path, format)
     val decodeRecords =
-      CsvDecoder.decodeRowsAs[CsvRecord].providedHeader(
-        headerInfo,
-        reader.drop(1),
-      )
+      CsvDecoder.decodeRowsAs[CsvRecord].usingHeaderInfo(reader)
+//      CsvDecoder.decodeRowsAs[CsvRecord].providedHeader(
+//        headerInfo,
+//        reader.drop(1),
+//      )
     // TODO: How to count errors?
     decodeRecords.run {
       ZSink.foldLeft(ImportResults()) {
