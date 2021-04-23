@@ -17,9 +17,9 @@ object Main extends App {
         .mapKey(toKebabCase(_).toLowerCase)
         .from(cmdLineArgs)
       for {
-        envVars ← ConfigSource.fromSystemEnv
+        envVars <- ConfigSource.fromSystemEnv
         // Pull server configs from the command-line args first, then from env vars, then the defaults
-        serverConfig ← IO.fromEither {
+        serverConfig <- IO.fromEither {
           read {
             lazy val serverConfigFromEnv = ServerConfig
               .loader
@@ -33,8 +33,8 @@ object Main extends App {
     }
     val deployInfoLayer = ZLayer.fromEffect {
       for {
-        clock ← ZIO.service[Clock.Service]
-        now ← clock.currentDateTime
+        clock <- ZIO.service[Clock.Service]
+        now <- clock.currentDateTime
       } yield DeployInfo(now)
     }
     // start the web server

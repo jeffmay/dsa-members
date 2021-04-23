@@ -16,24 +16,24 @@ object RunJob extends App {
 //    val linesOfFile = ZStream.fromFile(sampleFile).transduce(
 //      ZTransducer.utfDecode >>> ZTransducer.splitLines,
 //    )
-//    val printAll = for ((line, idx) ← linesOfFile.zipWithIndex)
+//    val printAll = for ((line, idx) <- linesOfFile.zipWithIndex)
 //      console.putStrLn(s"Line ${idx + 1}: $line")
 
 //    for {
-//      _ ← printAll.orDie
+//      _ <- printAll.orDie
 //    } yield ExitCode.success
     for {
-//      console ← ZIO.service[Console.Service]
-//      _ ← console.putStrLn("Hello. What file do you want to process?")
-//      filename ← console.getStrLn.orDie
-      count ← ImportNationalMembership.fromCsvFile(
+//      console <- ZIO.service[Console.Service]
+//      _ <- console.putStrLn("Hello. What file do you want to process?")
+//      filename <- console.getStrLn.orDie
+      count <- ImportNationalMembership.fromCsvFile(
         Paths.get(
           "tmp",
           "dsasf-2021-03-21.csv",
         ),
         CsvFormat.Default,
       )
-      _ ← console.putStrLn(
+      _ <- console.putStrLn(
         s"Total successes: ${count.successes}, failures: ${count.failures}",
       )
     } yield ExitCode.success

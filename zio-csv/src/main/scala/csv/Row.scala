@@ -31,15 +31,15 @@ final class Row private (
   ): Cell[Has[HeaderCtx]] = Cell.fromEffect {
     for {
       // grab the header context so we can look up the column index by name
-      header ← ZIO.service[HeaderCtx]
+      header <- ZIO.service[HeaderCtx]
       // get the column index or fail
-      colIdx ← ZIO.fromEither {
+      colIdx <- ZIO.fromEither {
         header.columns.get(key).toRight {
           InvalidColumnName(rowIndex, key)
         }
       }
       // reuse the logic above to create our underlying
-      cellCtx ← apply(colIdx).asEnv
+      cellCtx <- apply(colIdx).asEnv
     } yield cellCtx
   }
 }

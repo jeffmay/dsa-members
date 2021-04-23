@@ -5,7 +5,7 @@ import munit.ScalaCheckSuite
 import org.scalacheck.rng.Seed
 
 trait ImplicitScalaCheckSeedForSuite {
-  self: ScalaCheckSuite ⇒
+  self: ScalaCheckSuite =>
 
   /** Override the initial seed to be a `val` so that it is fixed for the whole suite.
     */

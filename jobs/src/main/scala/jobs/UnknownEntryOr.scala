@@ -26,9 +26,9 @@ final case class UnknownEntryOr[E](
 object UnknownEntryOr {
 
   def apply[E : EnumCodec]: Builder[E] =
-    new Builder[E](str ⇒ NoSuchMember(EnumCodec[E].valueNames, str))
+    new Builder[E](str => NoSuchMember(EnumCodec[E].valueNames, str))
 
-  final class Builder[E](private val buildException: String ⇒ NoSuchMember)
+  final class Builder[E](private val buildException: String => NoSuchMember)
     extends AnyVal {
 
     def fromKnown(known: E): UnknownEntryOr[E] = fromEither(Right(known))
@@ -38,7 +38,7 @@ object UnknownEntryOr {
 
     def fromEither(originalOrKnown: Either[String, E]): UnknownEntryOr[E] =
       UnknownEntryOr[E] {
-        originalOrKnown.left.map { str ⇒
+        originalOrKnown.left.map { str =>
           buildException(str)
         }
       }

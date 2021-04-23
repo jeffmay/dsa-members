@@ -23,8 +23,8 @@ trait CommonDecoders {
     E : EnumCodec,
   ]: CellDecoder[
     UnknownEntryOr[E],
-  ] = CellDecoder.fromStringTotal { str ⇒
-    EnumCodec[E].findByNameInsensitiveOpt(str).map { entry ⇒
+  ] = CellDecoder.fromStringTotal { str =>
+    EnumCodec[E].findByNameInsensitiveOpt(str).map { entry =>
       UnknownEntryOr[E].fromKnown(entry)
     }.getOrElse {
       UnknownEntryOr[E].fromUnknown(str)
@@ -32,7 +32,7 @@ trait CommonDecoders {
   }
 
   implicit val decodeEmailAddress: CellDecoder[EmailAddress] =
-    CellDecoder.fromStringSafe { cell ⇒
+    CellDecoder.fromStringSafe { cell =>
       require(
         cell.nonEmpty,
         s"EmailAddress cannot be empty.",
@@ -76,19 +76,19 @@ trait CommonDecoders {
 
     // Use laziness in downstream operations, but start with the same cached starting collection
     val formats = LazyList(
-      "DSA_LOCAL_DATE_TIME (YYYY-MM-DD[' 'HH:MM])" → dsaLocalDateTime,
-      "BASIC_ISO_DATE (YYYYMMDD)" → DateTimeFormatter.BASIC_ISO_DATE,
-      "RFC-1123 (DOW, DD Mon YYYY)" → DateTimeFormatter.RFC_1123_DATE_TIME,
-      "ISO_ORDINAL_DATE (YYYY-DOY)" → DateTimeFormatter.ISO_ORDINAL_DATE,
+      "DSA_LOCAL_DATE_TIME (YYYY-MM-DD[' 'HH:MM])" -> dsaLocalDateTime,
+      "BASIC_ISO_DATE (YYYYMMDD)" -> DateTimeFormatter.BASIC_ISO_DATE,
+      "RFC-1123 (DOW, DD Mon YYYY)" -> DateTimeFormatter.RFC_1123_DATE_TIME,
+      "ISO_ORDINAL_DATE (YYYY-DOY)" -> DateTimeFormatter.ISO_ORDINAL_DATE,
     )
-    CellDecoder.fromStringSafe { str ⇒
+    CellDecoder.fromStringSafe { str =>
       // create two lazy lists: one that accumulate failures and one that accumulates successes
       val (failures, successes) =
         formats.partitionMap {
-          case (name, format) ⇒
+          case (name, format) =>
             Try(LocalDate.parse(str, format)).toEither.left.map {
-              case ex: DateTimeException ⇒ (name, ex)
-              case ex ⇒ throw ex
+              case ex: DateTimeException => (name, ex)
+              case ex => throw ex
             }
         }
       // lazily find the first success, or fail with all the accumulated DateFormatExceptions
@@ -104,7 +104,7 @@ final case class DateFormatException(
   patternErrors: Seq[(String, DateTimeException)],
 ) extends Exception({
     val messages =
-      patternErrors.iterator.map { case (name, ex) ⇒
+      patternErrors.iterator.map { case (name, ex) =>
         val msg = ex.getMessage.drop {
           "Text '' could not be parsed,".length + content.length
         }.trim

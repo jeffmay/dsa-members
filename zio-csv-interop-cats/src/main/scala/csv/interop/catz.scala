@@ -39,7 +39,7 @@ private class CatsCellDecoderSemigroupK extends SemigroupK[CellDecoder] {
 final private class CatsCellDecoderMonadError
   extends MonadError[CellDecoder, CellDecodingFailure] {
 
-  override def map[A, B](fa: CellDecoder[A])(f: A ⇒ B): CellDecoder[B] =
+  override def map[A, B](fa: CellDecoder[A])(f: A => B): CellDecoder[B] =
     fa.map(f)
 
   override def product[A, B](
@@ -48,25 +48,25 @@ final private class CatsCellDecoderMonadError
   ): CellDecoder[(A, B)] = fa.product(fb)
 
   override def ap[A, B](
-    ff: CellDecoder[A ⇒ B],
+    ff: CellDecoder[A => B],
   )(fa: CellDecoder[A]): CellDecoder[B] = ff.product(fa).map {
-    case (f, a) ⇒ f(a)
+    case (f, a) => f(a)
   }
 
-  override def ap2[A, B, Z](ff: CellDecoder[(A, B) ⇒ Z])(
+  override def ap2[A, B, Z](ff: CellDecoder[(A, B) => Z])(
     fa: CellDecoder[A],
     fb: CellDecoder[B],
   ): CellDecoder[Z] =
     ff.product(fa.product(fb)).map {
-      case (f, (a, b)) ⇒ f(a, b)
+      case (f, (a, b)) => f(a, b)
     }
 
   override def map2[A, B, Z](
     fa: CellDecoder[A],
     fb: CellDecoder[B],
-  )(f: (A, B) ⇒ Z): CellDecoder[Z] =
+  )(f: (A, B) => Z): CellDecoder[Z] =
     fa.product(fb).map {
-      case (a, b) ⇒ f(a, b)
+      case (a, b) => f(a, b)
     }
 
   override def productR[A, B](fa: CellDecoder[A])(
@@ -79,11 +79,11 @@ final private class CatsCellDecoderMonadError
 
   override def flatMap[A, B](
     fa: CellDecoder[A],
-  )(f: A ⇒ CellDecoder[B]): CellDecoder[B] = fa.flatMap(f)
+  )(f: A => CellDecoder[B]): CellDecoder[B] = fa.flatMap(f)
 
   override def handleErrorWith[A](
     fa: CellDecoder[A],
-  )(f: CellDecodingFailure ⇒ CellDecoder[A]): CellDecoder[A] = { content ⇒
+  )(f: CellDecodingFailure => CellDecoder[A]): CellDecoder[A] = { content =>
     fa.decodeString(content).catchAll(f.andThen(_.decodeString(content)))
   }
 
@@ -91,7 +91,7 @@ final private class CatsCellDecoderMonadError
 
   override def tailRecM[A, B](
     a: A,
-  )(f: A ⇒ CellDecoder[Either[A, B]]): CellDecoder[B] = { content ⇒
+  )(f: A => CellDecoder[Either[A, B]]): CellDecoder[B] = { content =>
     MonadError[ZIO[MinCtx, CellDecodingFailure, *], CellDecodingFailure]
       .tailRecM[A, B](a)(f.andThen(_.decodeString(content)))
   }

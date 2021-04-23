@@ -28,7 +28,7 @@ trait CellDecoderInstances {
   implicit def arbCellDecoder[A : Arbitrary]: Arbitrary[CellDecoder[A]] = {
     Arbitrary {
       for {
-        fn ← arbitrary[String ⇒ Either[CellDecodingFailure, A]]
+        fn <- arbitrary[String => Either[CellDecodingFailure, A]]
       } yield CellDecoder.fromEither(fn)
     }
   }
@@ -37,8 +37,8 @@ trait CellDecoderInstances {
     seed: Seed,
   ): Eq[CellDecoder[A]] = {
     val runtime = Runtime.default
-    (x, y) ⇒ {
-      val test = Prop.forAll { a: String ⇒
+    (x, y) => {
+      val test = Prop.forAll { a: String =>
         val cell = Cell.detached(a)
         val xRes = runtime.unsafeRun(x.decodeCell(cell).either)
         val yRes = runtime.unsafeRun(y.decodeCell(cell).either)

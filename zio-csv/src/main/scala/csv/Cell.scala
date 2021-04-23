@@ -37,8 +37,8 @@ final class Cell[-R](
     decoder: CellDecoder[A],
   ): ZIO[R, DecodingFailure, A] = {
     for {
-      env ← asEnv
-      a ← CellDecoder[A]
+      env <- asEnv
+      a <- CellDecoder[A]
         // provide the resolved cell context as the environment for the decoder
         // the remaining context must come from outside the cell (i.e. the header context)
         .decodeString(env.get[CellCtx].content).provide(env)

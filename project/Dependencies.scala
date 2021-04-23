@@ -7,28 +7,30 @@ case class Deps(
 
 object Dependencies {
 
-  final private val catsVersion = "2.5.0"
+  final private val catsVersion = "2.6.0"
   //  private final val catsEffectVersion = "2.3.3"
   // private final val catsEffectVersion = "3.0.0-RC2"
   final private val disciplineVersion = "1.1.4"
-  final private val doobieVersion = "0.12.1"
+  final private val doobieVersion = "1.0.0-M1"
   final private val enumeratumVersion = "1.6.1"
-  final private val fs2Version = "2.5.3"
+//  final private val fs2Version = "2.5.3"
   // private final val fs2Version = "3.0.0-M9"
-  final private val munitVersion = "0.7.22"
+  final private val munitVersion = "0.7.25"
   final private val munitDisciplineVersion = "1.0.7"
+  final private val newtypeVersion = "0.4.4"
+  final private val refinedVersion = "0.9.24"
   final private val scalaCheckVersion = "1.15.3"
   final private val scalaCsvVersion = "1.3.7"
   final private val scalacticVersion = "3.2.7"
   final private val zioVersion = "1.0.5"
   final private val zioCatsVersion = "2.4.0.0"
-  final private val zioConfigVersion = "1.0.2"
-  final private val zioHttpVersion = "1.0.0.0-RC13"
+  final private val zioConfigVersion = "1.0.4"
+  final private val zioHttpVersion = "1.0.0.0-RC15"
   final private val zioJsonVersion = "0.1.3"
   final private val zioLoggingVersion = "0.5.8"
   final private val zioNioVersion = "1.0.0-RC10"
 
-  private val fs2Core = "co.fs2" %% "fs2-core" % fs2Version
+//  private val fs2Core = "co.fs2" %% "fs2-core" % fs2Version
   private val catsCore = "org.typelevel" %% "cats-core" % catsVersion
   private val catsLaws = "org.typelevel" %% "cats-laws" % catsVersion
   //  private val catsEffect = "org.typelevel" %% "cats-effect" % catsEffectVersion
@@ -39,6 +41,8 @@ object Dependencies {
   private val munit = "org.scalameta" %% "munit" % munitVersion
   private val munitDiscipline =
     "org.typelevel" %% "discipline-munit" % munitDisciplineVersion
+  private val newtype = "io.estatico" %% "newtype" % newtypeVersion
+  private val refined = "eu.timepit" %% "refined" % refinedVersion
   private val scalaCheck = "org.scalacheck" %% "scalacheck" % scalaCheckVersion
   private val scalaCsv = "com.github.tototoshi" %% "scala-csv" % scalaCsvVersion
   private val scalactic = "org.scalactic" %% "scalactic" % scalacticVersion
@@ -56,6 +60,8 @@ object Dependencies {
   final private val common = Deps(
     libraries = Seq(
       enumeratum,
+      newtype,
+      refined,
       zio,
       zioConfig,
       zioConfigMagnolia,
@@ -69,7 +75,7 @@ object Dependencies {
   final val api = Deps(
     libraries = common.libraries ++ Seq(
       doobieCore,
-      fs2Core,
+//      fs2Core,
       zioHttp,
       zioJson,
       zioStreams,
@@ -114,7 +120,7 @@ object Dependencies {
   final val database = Deps(
     libraries = common.libraries ++ Seq(
       doobieCore,
-      fs2Core,
+//      fs2Core,
     ),
   )
 

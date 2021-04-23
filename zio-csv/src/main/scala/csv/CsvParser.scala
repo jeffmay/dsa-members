@@ -19,10 +19,10 @@ object CsvParser {
     ZStream.fromFile(path)
       .transduce(ZTransducer.utf8Decode >>> ZTransducer.splitLines)
       .refineOrDie {
-        case NonFatal(ex) ⇒ ParsingException(ex)
+        case NonFatal(ex) => ParsingException(ex)
       }
       .zipWithIndex
-      .mapM { case (line, index) ⇒
+      .mapM { case (line, index) =>
         ZIO.fromEither {
           parser.parseLine(line).map(Row(index, _)).toRight {
             RowInvalidSyntax(index, s"Malformed Input: $line", None)

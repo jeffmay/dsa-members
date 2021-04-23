@@ -10,6 +10,10 @@ ThisBuild / scalaVersion := "2.13.5"
 // Avoid the error about unused key, since this is used by the IDE and not SBT
 Global / excludeLintKeys += idePackagePrefix
 
+val commonScalacOptions = scalacOptions ++= Seq(
+  "-deprecation",
+)
+
 def commonLibrary(
   id: String,
   dependencies: Deps,
@@ -21,6 +25,7 @@ def commonLibrary(
     idePackagePrefix := Some(packagePrefix),
     libraryDependencies ++= dependencies.libraries,
     resolvers ++= dependencies.resolvers,
+    commonScalacOptions,
     // Add support for Scala 3-like type lambda syntax
     addCompilerPlugin(
       "org.typelevel" % "kind-projector" % "0.11.3" cross CrossVersion.full,
@@ -61,6 +66,7 @@ def commonProject(
       idePackagePrefix := Some("org.dsasf.members"),
       libraryDependencies ++= dependencies.libraries,
       resolvers ++= dependencies.resolvers,
+      commonScalacOptions,
     )
 
 lazy val api = commonProject("api", Dependencies.api)

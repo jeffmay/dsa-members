@@ -18,7 +18,7 @@ object RowDecoder {
 
   implicit class FromHeaderOps[A](private val decoder: FromHeaderInfo[A])
     extends AnyVal {
-    def withFixedHeader(header: HeaderCtx): FromPositionOnly[A] = { row ⇒
+    def withFixedHeader(header: HeaderCtx): FromPositionOnly[A] = { row =>
       decoder.decode(row).provide(Has(header))
     }
   }

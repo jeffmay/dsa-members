@@ -110,7 +110,7 @@ object CellDecodingFailure {
     CellDecoder.MinCtx,
     CellDecodingFailure,
   ] = {
-    ZIO.services[RowCtx, CellCtx].map { case (row, cell) ⇒
+    ZIO.services[RowCtx, CellCtx].map { case (row, cell) =>
       GenericCellDecodingFailure(
         row.rowIndex,
         cell.columnIndex,
@@ -125,7 +125,7 @@ object CellDecodingFailure {
     CellDecoder.MinCtx,
     CellDecodingTypedFailure[A],
   ] = {
-    ZIO.services[RowCtx, CellCtx].map { case (row, cell) ⇒
+    ZIO.services[RowCtx, CellCtx].map { case (row, cell) =>
       CellDecodingException[A](
         row.rowIndex,
         cell.columnIndex,

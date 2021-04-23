@@ -98,7 +98,7 @@
 //      CellDecoder.MinCtx,
 //      CellDecodingTypedFailure[A],
 //    ] = {
-//      ZIO.services[RowCtx, CellCtx].map { case (row, cell) ⇒
+//      ZIO.services[RowCtx, CellCtx].map { case (row, cell) =>
 //        CellDecodingException[A](
 //          row.rowIndex,
 //          cell.columnIndex,
@@ -180,14 +180,14 @@
 //        Option.when(unsafeArray.isDefinedAt(idx)) {
 //          CellCtx(idx, unsafeArray(idx))
 //        }
-//      }.flatMap { cell ⇒
+//      }.flatMap { cell =>
 //        // grab the row context from the surrounding context
-//        ZIO.service[RowCtx].map { row ⇒
+//        ZIO.service[RowCtx].map { row =>
 //          Has.allOf(row, cell)
 //        }
-//      }.flatMapError { _ ⇒
+//      }.flatMapError { _ =>
 //        // we need the row context to produce our error as well
-//        ZIO.service[RowCtx].map { row ⇒
+//        ZIO.service[RowCtx].map { row =>
 //          InvalidColumnIndex(row.rowIndex, idx)
 //        }
 //      }
@@ -198,16 +198,16 @@
 //    ): Cell[Has[HeaderCtx] with Has[RowCtx]] = Cell.fromEffect {
 //      for {
 //        // grab the header context so we can look up the column index by name
-//        header ← ZIO.service[HeaderCtx]
+//        header <- ZIO.service[HeaderCtx]
 //        // get the column index or fail
-//        colIdx ← IO.succeed(header.columns.get(key)).some.flatMapError { _ ⇒
+//        colIdx <- IO.succeed(header.columns.get(key)).some.flatMapError { _ =>
 //          // we need the row context for our error message
-//          ZIO.service[RowCtx].map { row ⇒
+//          ZIO.service[RowCtx].map { row =>
 //            InvalidColumnName(row.rowIndex, key)
 //          }
 //        }
 //        // reuse the logic above to create our underlying
-//        cellCtx ← apply(colIdx).underlying
+//        cellCtx <- apply(colIdx).underlying
 //      } yield cellCtx
 //    }
 //
@@ -236,8 +236,8 @@
 //      decoder: CellDecoder[A],
 //    ): ZIO[R with Has[RowCtx], DecodingFailure, A] = {
 //      for {
-//        ctx ← underlying
-//        a ← CellDecoder[A]
+//        ctx <- underlying
+//        a <- CellDecoder[A]
 //          .decodeString(ctx.get[CellCtx].content).provideSome[R with Has[RowCtx]] {
 //            // provide the resolved cell context as the environment for the decoder
 //            // the remaining context must come from outside the cell (i.e. the row context and any header context)
@@ -253,16 +253,16 @@
 //
 //    def decodeString(cell: String): CellDecoder.Result[A]
 //
-//    def mapSafe[B : Tag](fn: A ⇒ B): CellDecoder[B] =
-//      flatMapSafe(a ⇒ CellDecoder.const(fn(a)))
+//    def mapSafe[B : Tag](fn: A => B): CellDecoder[B] =
+//      flatMapSafe(a => CellDecoder.const(fn(a)))
 //
-//    def flatMapSafe[B : Tag](fn: A ⇒ CellDecoder[B]): CellDecoder[B] =
-//      CellDecoder.fromEffect { cell ⇒
-//        decodeString(cell).flatMap { a ⇒
-//          ZIO.fromTry(Try(fn(a))).flatMap { decodeB ⇒
+//    def flatMapSafe[B : Tag](fn: A => CellDecoder[B]): CellDecoder[B] =
+//      CellDecoder.fromEffect { cell =>
+//        decodeString(cell).flatMap { a =>
+//          ZIO.fromTry(Try(fn(a))).flatMap { decodeB =>
 //            decodeB.decodeString(cell)
-//          }.flatMapError { ex ⇒
-//            ZIO.services[RowCtx, CellCtx].map { case (row, cell) ⇒
+//          }.flatMapError { ex =>
+//            ZIO.services[RowCtx, CellCtx].map { case (row, cell) =>
 //              CellDecodingException[B](
 //                row.rowIndex,
 //                cell.columnIndex,
@@ -289,7 +289,7 @@
 //      val validFalse = Set("false", "no", "n", "off", "0")
 //      val validOptions =
 //        (validTrue.toSeq ++ validFalse.toSeq).mkString("'", "', '", "'")
-//      fromStringSafe { raw ⇒
+//      fromStringSafe { raw =>
 //        // skip obviously wrong values
 //        if (raw.length > "false".length) false
 //        else {
@@ -321,7 +321,7 @@
 //      fromStringSafe(ZonedDateTime.parse(_))
 //
 //    implicit def optional[A : CellDecoder]: CellDecoder[Option[A]] =
-//      fromEffect { str ⇒
+//      fromEffect { str =>
 //        val trimmed = str.trim
 //        if (trimmed.isEmpty) {
 //          ZIO.succeed(None)
@@ -332,7 +332,7 @@
 //
 //    /** Does a match on the enum values based on the [[EnumCodec]]
 //      */
-//    implicit def fromEnum[E : IsEnum : Tag]: CellDecoder[E] = { cell ⇒
+//    implicit def fromEnum[E : IsEnum : Tag]: CellDecoder[E] = { cell =>
 //      ZIO.fromEither {
 //        IsEnum[E].codec.findByNameInsensitiveEither(cell)
 //      }.flatMapError {
@@ -340,10 +340,10 @@
 //      }
 //    }
 //
-//    def fromStringSafe[A : Tag](convert: String ⇒ A): CellDecoder[A] = { str ⇒
+//    def fromStringSafe[A : Tag](convert: String => A): CellDecoder[A] = { str =>
 //      ZIO(convert(str))
-//        .flatMapError { ex ⇒
-//          ZIO.services[RowCtx, CellCtx].map { case (row, cell) ⇒
+//        .flatMapError { ex =>
+//          ZIO.services[RowCtx, CellCtx].map { case (row, cell) =>
 //            CellDecodingException[A](
 //              row.rowIndex,
 //              cell.columnIndex,
@@ -353,23 +353,23 @@
 //        }
 //    }
 //
-//    def const[A](value: A): CellDecoder[A] = { _ ⇒
+//    def const[A](value: A): CellDecoder[A] = { _ =>
 //      ZIO.succeed(value)
 //    }
 //
-//    def fromEffect[A](convert: String ⇒ CellDecoder.Result[A]): CellDecoder[A] =
+//    def fromEffect[A](convert: String => CellDecoder.Result[A]): CellDecoder[A] =
 //      convert(_)
 //
 //    def fromEither[A](
-//      convert: String ⇒ Either[CellDecodingFailure, A],
-//    ): CellDecoder[A] = { str ⇒
+//      convert: String => Either[CellDecodingFailure, A],
+//    ): CellDecoder[A] = { str =>
 //      ZIO.fromEither(convert(str))
 //    }
 //
-//    def matchesRegex(re: Regex): CellDecoder[String] = fromEffect { str ⇒
+//    def matchesRegex(re: Regex): CellDecoder[String] = fromEffect { str =>
 //      ZIO.fromOption(Option.when(re.matches(str))(str))
-//        .flatMapError { _ ⇒
-//          ZIO.services[RowCtx, CellCtx].map { case (row, cell) ⇒
+//        .flatMapError { _ =>
+//          ZIO.services[RowCtx, CellCtx].map { case (row, cell) =>
 //            CellInvalidUnmatchedRegex[String](
 //              row.rowIndex,
 //              cell.columnIndex,
@@ -380,11 +380,11 @@
 //    }
 //
 //    def findAllMatches(re: Regex): CellDecoder[Iterable[Regex.Match]] =
-//      fromEffect { str ⇒
+//      fromEffect { str =>
 //        val ll = LazyList.from(re.findAllMatchIn(str))
 //        ZIO.fromOption(Option.unless(ll.isEmpty)(ll))
-//          .flatMapError { _ ⇒
-//            ZIO.services[RowCtx, CellCtx].map { case (row, cell) ⇒
+//          .flatMapError { _ =>
+//            ZIO.services[RowCtx, CellCtx].map { case (row, cell) =>
 //              CellInvalidUnmatchedRegex[Iterable[Regex.Match]](
 //                row.rowIndex,
 //                cell.columnIndex,
@@ -433,7 +433,7 @@
 //  ) extends AnyVal
 //    with ParseWithDecoder[Any, A] {
 ////    override def fromLines(lines: UStream[String]): Stream[RowFailure, A] = {
-////      lines.zipWithIndex.mapM { case (line, idx) ⇒
+////      lines.zipWithIndex.mapM { case (line, idx) =>
 ////        val row = parseRow(line)
 ////        val ctx = Has(RowCtx(idx))
 ////        decoder.decode(row).provide(ctx)
@@ -441,7 +441,7 @@
 ////    }
 //
 //    override def fromRows(rows: UStream[Csv.Row]): Stream[RowFailure, A] = {
-//      rows.zipWithIndex.mapM { case (row, rowIdx) ⇒
+//      rows.zipWithIndex.mapM { case (row, rowIdx) =>
 //        val ctx = Has(RowCtx(rowIdx))
 //        decoder.decode(row).provide(ctx)
 //      }
@@ -460,8 +460,8 @@
 //      HeaderCtx,
 //      UStream[Csv.Row],
 //    )]] = {
-//      rows.peel(ZSink.head).useNow.map { case (maybeHead, tail) ⇒
-//        maybeHead.map { row ⇒
+//      rows.peel(ZSink.head).useNow.map { case (maybeHead, tail) =>
+//        maybeHead.map { row =>
 ////          val row = parseRow(firstLine)
 //          val header = HeaderCtx(row.cells)
 //          (header, tail)
@@ -471,15 +471,15 @@
 //
 //    override def fromRows(rows: UStream[Csv.Row]): Stream[RowFailure, A] = {
 //      val maybeResults = readHeader(rows).map {
-//        case Some((header, dataRows)) ⇒
+//        case Some((header, dataRows)) =>
 //          println(s"HEADER = ${header.columns}")
-//          dataRows.zipWithIndex.map { case (row, rowIdx) ⇒
+//          dataRows.zipWithIndex.map { case (row, rowIdx) =>
 ////            val row = parseRow(line)
 //            val ctx = Has.allOf(header, RowCtx(rowIdx))
 //            println(s"ROW $rowIdx: $row")
 //            decoder.decode(row).provide(ctx)
 //          }
-//        case None ⇒
+//        case None =>
 //          ZStream.empty
 //      }
 //      ZStream.fromEffectOption(maybeResults).flatten.mapM(identity)

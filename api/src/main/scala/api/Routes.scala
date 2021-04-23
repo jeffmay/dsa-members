@@ -9,14 +9,12 @@ import zio.clock.Clock
 object Routes {
   type Reqs = Has[DeployInfo] with Clock
 
-  val monitorVersion: HttpApp[Reqs, HttpError] = Http.collectM[Request] {
-    case Method.GET ==> Root / "monitor" / "version" ⇒
+  val all: Http[Reqs, Throwable] = Http.collectM {
+    case Method.GET -> Root / "monitor" / "version" =>
       for {
-        deployInfo ← ZIO.service[DeployInfo]
-        clock ← ZIO.service[Clock.Service]
-        now ← clock.instant
+        deployInfo <- ZIO.service[DeployInfo]
+        clock <- ZIO.service[Clock.Service]
+        now <- clock.instant
       } yield Response.jsonString(DeployInfo.toJsonString(deployInfo, now))
   }
-
-  val all: HttpApp[Reqs, HttpError] = monitorVersion
 }

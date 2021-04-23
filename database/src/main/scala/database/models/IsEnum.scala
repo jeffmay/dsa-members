@@ -91,7 +91,7 @@
 //  ): EnumCodec[E] =
 //    new EnumCodec[E] {
 //      final private[this] lazy val lookupLowerCase =
-//        enum.valuesToEntriesMap.map { case (k, v) ⇒
+//        enum.valuesToEntriesMap.map { case (k, v) =>
 //          (k.toString.toLowerCase, v)
 //        }
 //      final override def values: IndexedSeq[E] = enum.values

@@ -36,9 +36,9 @@ object ImportNationalMembership {
       CsvDecoder.decodeRowsAs[CsvRecord].usingHeaderInfo(reader)
     decodeRecords.either.run {
       ZSink.foldLeft(ImportResults()) {
-        case (res, Left(failure)) ⇒
+        case (res, Left(failure)) =>
           res.recordFailure(failure)
-        case (res, Right(record)) ⇒
+        case (res, Right(record)) =>
           res.recordSuccess(record)
       }
     }

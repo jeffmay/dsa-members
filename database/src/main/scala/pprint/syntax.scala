@@ -5,7 +5,7 @@ object syntax {
 
   def prettyToString(p: Product): String = {
     p.productElementNames.zip(p.productIterator)
-      .map { case (name, value) ⇒ s"$name=$value" }
+      .map { case (name, value) => s"$name=$value" }
       .mkString(p.productPrefix + "(", ", ", ")")
   }
 
