@@ -19,7 +19,7 @@ object ImportNationalMembership {
     def recordSuccess(record: CsvRecord): ImportResults =
       copy(successes = this.successes + 1)
 
-    def recordFailure(failure: RowFailure): ImportResults =
+    def recordFailure(failure: ReadingFailure): ImportResults =
       copy(failures = this.failures + 1)
   }
 
@@ -34,17 +34,14 @@ object ImportNationalMembership {
     val reader = CsvParser.fromFile(path, format)
     val decodeRecords =
       CsvDecoder.decodeRowsAs[CsvRecord].usingHeaderInfo(reader)
-//      CsvDecoder.decodeRowsAs[CsvRecord].providedHeader(
-//        headerInfo,
-//        reader.drop(1),
-//      )
-    // TODO: How to count errors?
-    decodeRecords.run {
+    decodeRecords.either.run {
       ZSink.foldLeft(ImportResults()) {
-        case (res, record) ⇒
+        case (res, Left(failure)) ⇒
+          res.recordFailure(failure)
+        case (res, Right(record)) ⇒
           res.recordSuccess(record)
       }
-    }.orDie
+    }
   }
 
   private val headerInfo: HeaderCtx = HeaderCtx(Map(
