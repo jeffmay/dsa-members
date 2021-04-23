@@ -19,6 +19,7 @@ object Dependencies {
   final private val munitDisciplineVersion = "1.0.7"
   final private val scalaCheckVersion = "1.15.3"
   final private val scalaCsvVersion = "1.3.7"
+  final private val scalacticVersion = "3.2.7"
   final private val zioVersion = "1.0.5"
   final private val zioCatsVersion = "2.4.0.0"
   final private val zioConfigVersion = "1.0.2"
@@ -40,6 +41,7 @@ object Dependencies {
     "org.typelevel" %% "discipline-munit" % munitDisciplineVersion
   private val scalaCheck = "org.scalacheck" %% "scalacheck" % scalaCheckVersion
   private val scalaCsv = "com.github.tototoshi" %% "scala-csv" % scalaCsvVersion
+  private val scalactic = "org.scalactic" %% "scalactic" % scalacticVersion
   private val zio = "dev.zio" %% "zio" % zioVersion
   private val zioCats = "dev.zio" %% "zio-interop-cats" % zioCatsVersion
   private val zioConfig = "dev.zio" %% "zio-config" % zioConfigVersion
@@ -116,8 +118,9 @@ object Dependencies {
     ),
   )
 
-  final val importer = Deps(
+  final val jobs = Deps(
     libraries = common.libraries ++ Seq(
+      scalactic,
       zioNio,
       zioStreams,
     ),

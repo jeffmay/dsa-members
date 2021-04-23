@@ -73,7 +73,7 @@ lazy val database = commonProject("database", Dependencies.database)
     enumeratumOps,
   )
 
-lazy val jobs = commonProject("jobs", Dependencies.importer)
+lazy val jobs = commonProject("jobs", Dependencies.jobs)
   .dependsOn(
     csv,
     database,

@@ -169,9 +169,12 @@ final case class CellDecodingException[A : Tag](
 ) extends DecodingFailure(
     rowIndex,
     s"Expected cell at column ${columnIndex + 1} to be of type ${Tag[A].tag}. Caused by:\n$cause",
-    Some(cause),
+    None, // the exception is already printed as part of this message
   )
   with CellDecodingTypedFailure[A] {
+
+  override def initCause(cause: Throwable): Throwable = super.initCause(cause)
+
   override val expectedType: Tag[A] = Tag[A]
   override def withNewExpectedType[B : Tag]: CellDecodingTypedFailure[B] =
     copy[B]()
