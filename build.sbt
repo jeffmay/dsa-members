@@ -7,6 +7,9 @@ ThisBuild / scalaVersion := "2.13.5"
 //ThisBuild / scalaVersion := "3.0.0-RC1"
 //ThisBuild / useScala3doc := true
 
+// Run the formatter on compile to avoid checking in un-formatted code
+ThisBuild / scalafmtOnCompile := true
+
 // Avoid the error about unused key, since this is used by the IDE and not SBT
 Global / excludeLintKeys += idePackagePrefix
 
