@@ -1,0 +1,29 @@
+version: '3.1'
+services:
+
+  # The REST / GraphQL API
+#  api:
+#    image: dsasanfrancisco/membership_api
+    # All environment variables should go in these files
+    # The order is significant and .env must override all others
+#    env_file:
+#      - .env
+#    depends_on:
+#      - db
+#    container_name: dsa_api
+
+  # The SQL database
+  db:
+    # TODO: Switch back to postgres or use a custom Dockerfile?
+    image: postgis/postgis:latest
+    restart: always
+    # All environment variables should go in these files
+    # The order is significant and .env must override all others
+    env_file:
+      - .env
+    volumes:
+      - dsa_postgres:/var/lib/postgresql/data
+    container_name: dsa_postgres
+
+volumes:
+  dsa_postgres:

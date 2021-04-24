@@ -8,13 +8,11 @@ case class Deps(
 object Dependencies {
 
   final private val catsVersion = "2.6.0"
-  //  private final val catsEffectVersion = "2.3.3"
-  // private final val catsEffectVersion = "3.0.0-RC2"
+  final private val catsEffectVersion = "3.1.0"
   final private val disciplineVersion = "1.1.4"
   final private val doobieVersion = "1.0.0-M1"
   final private val enumeratumVersion = "1.6.1"
-//  final private val fs2Version = "2.5.3"
-  // private final val fs2Version = "3.0.0-M9"
+  final private val fs2Version = "3.0.2"
   final private val munitVersion = "0.7.25"
   final private val munitDisciplineVersion = "1.0.7"
   final private val newtypeVersion = "0.4.4"
@@ -30,14 +28,16 @@ object Dependencies {
   final private val zioLoggingVersion = "0.5.8"
   final private val zioNioVersion = "1.0.0-RC10"
 
-//  private val fs2Core = "co.fs2" %% "fs2-core" % fs2Version
   private val catsCore = "org.typelevel" %% "cats-core" % catsVersion
   private val catsLaws = "org.typelevel" %% "cats-laws" % catsVersion
-  //  private val catsEffect = "org.typelevel" %% "cats-effect" % catsEffectVersion
+  private val catsEffect = "org.typelevel" %% "cats-effect" % catsEffectVersion
   private val discipline =
     "org.typelevel" %% "discipline-core" % disciplineVersion
   private val doobieCore = "org.tpolecat" %% "doobie-core" % doobieVersion
+  private val doobiePostgres =
+    "org.tpolecat" %% "doobie-postgres" % doobieVersion
   private val enumeratum = "com.beachape" %% "enumeratum" % enumeratumVersion
+  private val fs2Core = "co.fs2" %% "fs2-core" % fs2Version
   private val munit = "org.scalameta" %% "munit" % munitVersion
   private val munitDiscipline =
     "org.typelevel" %% "discipline-munit" % munitDisciplineVersion
@@ -74,7 +74,7 @@ object Dependencies {
 
   final val api = Deps(
     libraries = common.libraries ++ Seq(
-      doobieCore,
+//      doobieCore,
 //      fs2Core,
       zioHttp,
       zioJson,
@@ -119,8 +119,11 @@ object Dependencies {
 
   final val database = Deps(
     libraries = common.libraries ++ Seq(
+      catsCore,
+      catsEffect,
       doobieCore,
-//      fs2Core,
+      doobiePostgres,
+      fs2Core,
     ),
   )
 

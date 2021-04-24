@@ -1,0 +1,14 @@
+version: '3.1'
+services:
+
+  # The REST / GraphQL API
+#  api:
+#    build:
+#      context: .
+#      dockerfile: docker/api/Dockerfile
+
+  # The SQL database
+  db:
+    # Expose the ports for local development
+    ports:
+      - 5432:5432
