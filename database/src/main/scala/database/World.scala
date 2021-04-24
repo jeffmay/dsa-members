@@ -1,13 +1,21 @@
 package org.dsasf.members
 package database
 
-import cats._
 import cats.effect._
 import cats.implicits._
 import doobie._
 import doobie.implicits._
+import eu.timepit.refined.auto._
+import org.dsasf.members.database.models.DomesticPhoneNumber
 
 object World extends IOApp {
+
+  case class Country(
+    code: String,
+    name: String,
+    pop: Int,
+    gnp: Option[BigDecimal],
+  )
 
   override def run(args: List[String]): IO[ExitCode] = {
     // A transactor that gets connections from java.sql.DriverManager and executes blocking operations
@@ -18,6 +26,9 @@ object World extends IOApp {
       "postgres", // user
       "u1h10HNjt1UH", // password
     )
+    val y = xa.yolo
+    import y._
+
     val program1 = 42.pure[ConnectionIO]
     val program2 = sql"select 42".query[Int].unique
     val program3: ConnectionIO[(Int, Double)] =
@@ -28,9 +39,26 @@ object World extends IOApp {
     val program4 = sql"select name from country"
       .query[String] // Query0[String]
       .to[List] // ConnectionIO[List[String]]
+
+    def biggerThan(minPop: Int) = sql"""
+      select code, name, population, gnp
+      from country
+      where population > $minPop
+    """.query[Country]
+
+    def populationIn(range: Range) = sql"""
+      select code, name, population, gnp
+      from country
+      where population > ${range.min}
+      and   population < ${range.max}
+    """.query[Country]
+
+    val q = biggerThan(100)
+
     for {
-      rs <- program4.transact(xa)
-      _ = rs.take(5).foreach(println)
+      _ <- q.check
+      countries <- q.to[List].transact(xa)
+      _ = countries.take(5).foreach(println)
 //      _ = println(s"rs=$rs")
     } yield ExitCode.Success
   }
