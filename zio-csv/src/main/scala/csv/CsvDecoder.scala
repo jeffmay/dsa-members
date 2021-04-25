@@ -3,8 +3,6 @@ package csv
 
 import stream.{ZSink, ZStream}
 
-import zio.csv.RowDecoder.Result
-
 object CsvDecoder {
 
   /** Peels off the header row(s) and returns the [[HeaderCtx]] as well as
@@ -21,62 +19,27 @@ object CsvDecoder {
     }
   }
 
-  def decodeRowsAs[A]: DecodeRowsAsOrFail[A] = new DecodeRowsAsOrFail
-
-  def decodeRowsAsEitherFailureOr[A]: DecodeRowsAsEitherFailuresOr[A] =
-    new DecodeRowsAsEitherFailuresOr
+  def decodeRowsAs[A]: DecodeRowsAs[A] = new DecodeRowsAs
 }
 
-final class DecodeRowsAsOrFail[A](private val dummy: Boolean = true)
-  extends AnyVal with DecodeRowsAs[RowFailure, A, A] {
+final class DecodeRowsAs[A](private val dummy: Boolean = true) extends AnyVal {
 
-  override protected def wrapResult[R](
-    result: Result[R, A],
-  ): ZIO[R, RowFailure, A] = result
-}
-
-final class DecodeRowsAsEitherFailuresOr[A](private val dummy: Boolean = true)
-  extends AnyVal with DecodeRowsAs[Nothing, A, Either[RowFailure, A]] {
-
-  override protected def wrapResult[R](
-    result: Result[R, A],
-  ): ZIO[R, Nothing, Either[RowFailure, A]] = result.either
-
-//  override protected def wrapResult[R, E](
-//    result: ZStream[R, E, A],
-//  ): ZIO[R, Nothing, Either[RowFailure, A]] = result.either
-//
-//  def usingPositionOnly[R, E1](
-//    rows: ZStream[R, E1, Row],
-//  )(implicit decoder: RowDecoder.FromPositionOnly[A]): ZStream[R, E1, Either[DecodingFailure, A]] = {
-//    rows.mapM { row =>
-//      decoder.decode(row).either
-//    }
-//  }
-}
-
-sealed trait DecodeRowsAs[+E <: RowFailure, A, +T] extends Any {
-
-  protected def wrapResult[R](
-    result: RowDecoder.Result[R, A],
-  ): ZIO[R, E, T]
-
-  def usingPositionOnly[R, E1 >: E](
+  def usingPositionOnly[R, E1 >: RowFailure](
     rows: ZStream[R, E1, Row],
-  )(implicit decoder: RowDecoder.FromPositionOnly[A]): ZStream[R, E1, T] = {
+  )(implicit decoder: RowDecoder.FromPositionOnly[A]): ZStream[R, E1, A] = {
     rows.mapM { row =>
-      wrapResult(decoder.decode(row))
+      decoder.decode(row)
     }
   }
 
   def usingHeaderInfo[R, E1 >: RowFailure](
     rows: ZStream[R, E1, Row],
-  )(implicit decoder: RowDecoder.FromHeaderInfo[A]): ZStream[R, E1, T] = {
+  )(implicit decoder: RowDecoder.FromHeaderInfo[A]): ZStream[R, E1, A] = {
     val readHeaderThenAllRows = CsvDecoder.readHeaderInfo(rows).map {
       case Some((header, dataRows)) =>
         dataRows.mapM { row =>
           val env = Has.allOf(header, row.rowContext)
-          wrapResult(decoder.decode(row).provide(env))
+          decoder.decode(row).provide(env)
         }
       case None =>
         ZStream.empty
@@ -85,12 +48,12 @@ sealed trait DecodeRowsAs[+E <: RowFailure, A, +T] extends Any {
     ZStream.managed(readHeaderThenAllRows).flatten
   }
 
-  def providedHeader[R, E1 >: E](
+  def providedHeader[R, E1 >: RowFailure](
     header: HeaderCtx,
     dataRows: ZStream[R, E1, Row],
   )(implicit
     decoder: RowDecoder.FromHeaderInfo[A],
-  ): ZStream[R, E1, T] = {
+  ): ZStream[R, E1, A] = {
     usingPositionOnly(dataRows)(decoder.withFixedHeader(header))
   }
 }
