@@ -14,7 +14,13 @@ object CsvParser {
   def fromFile(
     path: Path,
     format: CSVFormat,
-  ): ZStream[Blocking, ReadingFailure, Row] = {
+  ): ZStream[Blocking, ReadingFailure, Row] =
+    fromFileEither(path, format).absolve
+
+  def fromFileEither(
+    path: Path,
+    format: CSVFormat,
+  ): ZStream[Blocking, ParsingFailure, Either[RowParsingFailure, Row]] = {
     val parser = new CSVParser(format)
     ZStream.fromFile(path)
       .transduce(ZTransducer.utf8Decode >>> ZTransducer.splitLines)
@@ -22,11 +28,9 @@ object CsvParser {
         case NonFatal(ex) => ParsingException(ex)
       }
       .zipWithIndex
-      .mapM { case (line, index) =>
-        ZIO.fromEither {
-          parser.parseLine(line).map(Row(index, _)).toRight {
-            RowInvalidSyntax(index, s"Malformed Input: $line", None)
-          }
+      .map { case (line, index) =>
+        parser.parseLine(line).map(Row(index, _)).toRight {
+          RowInvalidSyntax(index, s"Malformed Input: $line", None)
         }
       }
   }

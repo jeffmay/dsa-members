@@ -15,6 +15,7 @@ Global / excludeLintKeys += idePackagePrefix
 
 val commonScalacOptions = scalacOptions ++= Seq(
   "-deprecation",
+  "-Ymacro-annotations",
 )
 
 def commonLibrary(

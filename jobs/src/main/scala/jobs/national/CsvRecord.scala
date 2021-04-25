@@ -1,28 +1,23 @@
 package org.dsasf.members
 package jobs.national
 
-import database.models.national.{
-  MailPreference,
-  MembershipStatus,
-  MembershipType,
-  MonthlyDuesStatus,
-}
-import database.models.{Address, EmailAddress, Name}
+import database.models.national._
+import database.models.{Address, EmailAddress, NameComponentsUsa, PhoneNumber}
 import jobs.{national, CommonDecoders, UnknownEntryOr}
 
-import zio.csv.RowDecoder
+import zio.csv.{CellDecoder, RowDecoder}
 
 import java.time.LocalDate
 
 // TODO: Handle empty strings at the type-level
 final case class CsvRecord(
-  akId: String,
-  name: Name,
+  akId: AkID,
+  name: NameComponentsUsa,
   billingAddress: Address,
   mailingAddress: Address,
-  mobilePhone: String,
-  homePhone: String,
-  workPhone: String,
+  mobilePhone: Option[PhoneNumber],
+  homePhone: Option[PhoneNumber],
+  workPhone: Option[PhoneNumber],
   emailAddress: Option[EmailAddress],
   mailPreference: UnknownEntryOr[MailPreference],
   doNotCall: Boolean,
@@ -71,10 +66,13 @@ object CsvRecord extends CommonDecoders {
     final val DSA_CHAPTER = "DSA_chapter"
   }
 
+  implicit val decodeAkID: CellDecoder[AkID] =
+    CellDecoder.fromStringTotal(AkID(_))
+
   implicit val decodeWithHeaders: RowDecoder.FromHeaderInfo[CsvRecord] = {
     row =>
       for {
-        akId <- row(Keys.AK_ID).asString
+        akId <- row(Keys.AK_ID).as[AkID]
         firstName <- row(Keys.FIRST_NAME).asString
         middleName <- row(Keys.MIDDLE_NAME).asString
         lastName <- row(Keys.LAST_NAME).asString
@@ -89,9 +87,9 @@ object CsvRecord extends CommonDecoders {
         mailingCity <- row(Keys.MAILING_CITY).asString
         mailingState <- row(Keys.MAILING_STATE).asString
         mailingZip <- row(Keys.MAILING_ZIP).asString
-        mobilePhone <- row(Keys.MOBILE_PHONE).asString
-        homePhone <- row(Keys.HOME_PHONE).asString
-        workPhone <- row(Keys.WORK_PHONE).asString
+        mobilePhone <- row(Keys.MOBILE_PHONE).as[Option[PhoneNumber]]
+        homePhone <- row(Keys.HOME_PHONE).as[Option[PhoneNumber]]
+        workPhone <- row(Keys.WORK_PHONE).as[Option[PhoneNumber]]
         emailAddress <- row(Keys.EMAIL).as[Option[EmailAddress]]
         mailPreference <-
           row(Keys.MAIL_PREFERENCE).as[UnknownEntryOr[MailPreference]]
@@ -106,7 +104,7 @@ object CsvRecord extends CommonDecoders {
           row(Keys.MEMBERSHIP_STATUS).as[UnknownEntryOr[MembershipStatus]]
       } yield national.CsvRecord(
         akId,
-        Name(
+        NameComponentsUsa(
           firstName,
           middleName,
           lastName,

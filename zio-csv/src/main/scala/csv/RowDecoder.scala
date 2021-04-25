@@ -16,6 +16,18 @@ object RowDecoder {
     @inline def apply[A : FromHeaderInfo]: FromHeaderInfo[A] = implicitly
   }
 
+  implicit def decodeEither[R, A](implicit
+    decoder: RowDecoder[R, A],
+  ): RowDecoder[R, Either[DecodingFailure, A]] = { row =>
+    decoder.decode(row).either
+  }
+
+  implicit def decodeOptional[R, A](implicit
+    decoder: RowDecoder[R, A],
+  ): RowDecoder[R, Option[A]] = { row =>
+    decoder.decode(row).either.map(_.toOption)
+  }
+
   implicit class FromHeaderOps[A](private val decoder: FromHeaderInfo[A])
     extends AnyVal {
     def withFixedHeader(header: HeaderCtx): FromPositionOnly[A] = { row =>

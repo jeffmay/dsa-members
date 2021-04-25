@@ -1,18 +1,14 @@
 package org.dsasf.members
 package jobs
 
-import database.models.EmailAddress
+import database.models.{EmailAddress, PhoneNumber}
 
-import cats.data.NonEmptyList
 import enumeratum.ops.EnumCodec
-import zio.csv.CellDecoder
+import zio.ZIO
+import zio.csv.{CellDecoder, CellDecodingFailure}
 
-import java.time.format.{
-  DateTimeFormatter,
-  DateTimeFormatterBuilder,
-  ResolverStyle,
-}
-import java.time.temporal.{ChronoField, TemporalField}
+import java.time.format.{DateTimeFormatter, DateTimeFormatterBuilder}
+import java.time.temporal.ChronoField
 import java.time.{DateTimeException, LocalDate}
 import scala.util.Try
 import scala.util.control.NoStackTrace
@@ -31,30 +27,38 @@ trait CommonDecoders {
     }
   }
 
+  implicit val decodePhoneNumber: CellDecoder[PhoneNumber] =
+    CellDecoder.fromEffect { content =>
+      PhoneNumber.parse(content).fold(
+        CellDecodingFailure.fromMessage(_).flip,
+        ZIO.succeed(_),
+      )
+    }
+
   implicit val decodeEmailAddress: CellDecoder[EmailAddress] =
-    CellDecoder.fromStringSafe { cell =>
+    CellDecoder.fromStringSafe { content =>
       require(
-        cell.nonEmpty,
+        content.nonEmpty,
         s"EmailAddress cannot be empty.",
       )
-      val firstAtSymbol = cell.indexOf('@')
+      val firstAtSymbol = content.indexOf('@')
       require(
         firstAtSymbol >= 0,
-        s"EmailAddress '$cell' requires an '@' symbol. None found.",
+        s"EmailAddress '$content' requires an '@' symbol. None found.",
       )
       require(
         firstAtSymbol > 0,
-        s"EmailAddress '$cell' requires a username before the '@' symbol.",
+        s"EmailAddress '$content' requires a username before the '@' symbol.",
       )
-      val username = cell.take(firstAtSymbol)
+      val username = content.take(firstAtSymbol)
       require(
         username.nonEmpty,
-        s"EmailAddress '$cell' username cannot be empty.",
+        s"EmailAddress '$content' username cannot be empty.",
       )
-      val domain = cell.drop(firstAtSymbol + 1)
+      val domain = content.drop(firstAtSymbol + 1)
       require(
         domain.nonEmpty,
-        s"EmailAddress '$cell' domain cannot be empty.",
+        s"EmailAddress '$content' domain cannot be empty.",
       )
       require(
         !domain.contains('@'),

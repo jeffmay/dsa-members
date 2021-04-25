@@ -2,10 +2,10 @@ package org.dsasf.members
 package jobs.national
 
 import com.github.tototoshi.csv.CSVFormat
-import zio.URIO
+import zio.{URIO, ZIO, ZLayer}
 import zio.blocking.Blocking
 import zio.csv.{CsvDecoder, CsvParser, ReadingFailure}
-import zio.stream.ZSink
+import zio.stream.{ZSink, ZStream}
 
 import java.nio.file.Path
 
@@ -33,8 +33,8 @@ object ImportNationalMembership {
   ): URIO[Blocking, ImportResults] = {
     val reader = CsvParser.fromFile(path, format)
     val decodeRecords =
-      CsvDecoder.decodeRowsAs[CsvRecord].usingHeaderInfo(reader)
-    decodeRecords.either.run {
+      CsvDecoder.decodeRowsAsEitherFailureOr[CsvRecord].usingHeaderInfo(reader)
+    decodeRecords.catchAll(f => ZStream.succeed(Left(f))).run {
       ZSink.foldLeft(ImportResults()) {
         case (res, Left(failure)) =>
           res.recordFailure(failure)
