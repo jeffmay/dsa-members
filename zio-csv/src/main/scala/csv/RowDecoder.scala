@@ -16,6 +16,16 @@ object RowDecoder {
     @inline def apply[A : FromHeaderInfo]: FromHeaderInfo[A] = implicitly
   }
 
+  /** Build a [[RowDecoder]] with a given function, rather than rely on converting
+    * from a single abstract method (SAM).
+    *
+    * This is helpful for getting better compiler error messages when variance would
+    * make your row or result type not match the expected return type.
+    */
+  def build[R, A](
+    decoder: Row[R] => RowDecoder.Result[R, A],
+  ): RowDecoder[R, A] = decoder.apply
+
   implicit def decodeEither[R, A](implicit
     decoder: RowDecoder[R, A],
   ): RowDecoder[R, Either[DecodingFailure, A]] = { row =>
@@ -31,7 +41,7 @@ object RowDecoder {
   implicit class FromHeaderOps[A](private val decoder: FromHeaderInfo[A])
     extends AnyVal {
     def withFixedHeader(header: HeaderCtx): FromPositionOnly[A] = { row =>
-      decoder.decode(row.addToContext(header)).provide(Has(header))
+      decoder.decode(row.setHeaderContext(header)).provide(Has(header))
     }
   }
 

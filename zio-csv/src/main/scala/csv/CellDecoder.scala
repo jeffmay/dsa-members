@@ -21,7 +21,7 @@ trait CellDecoder[A] {
 
   /** Decode the given [[Cell]] into the expected type or return a [[CellDecodingFailure]].
     */
-  final def decodeCell(cell: Cell[Any]): ZIO[Any, DecodingFailure, A] = {
+  final def decodeCell(cell: Cell): IO[DecodingFailure, A] = {
     for {
       env <- cell.asEnv
       res <- decodeString(env.get[CellCtx].content).provide(env)
@@ -104,7 +104,7 @@ trait CellDecoder[A] {
 }
 
 object CellDecoder {
-  type MinCtx = Has[RowCtx] with Has[CellCtx]
+  type MinCtx = Has[RowCtx] with Has[CellCtx] with Has[MaybeHeaderCtx]
   type Result[A] = ZIO[MinCtx, CellDecodingFailure, A]
 
   @inline def apply[A](implicit

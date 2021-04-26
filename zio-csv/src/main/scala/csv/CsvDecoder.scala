@@ -12,10 +12,10 @@ object CsvDecoder {
   def readHeaderInfo[R, E >: RowFailure](
     rows: ZStream[R, E, Row[Any]],
   ): ZManaged[R, E, Option[(HeaderCtx, ZStream[R, E, Row[Has[HeaderCtx]]])]] = {
-    rows.peel(ZSink.head).map { case (maybeHead, tail) =>
+    rows.peel(ZSink.head[Row[Any]]).map { case (maybeHead, tail) =>
       maybeHead.map { firstRow =>
         val ctx = HeaderCtx(firstRow.cells)
-        (ctx, tail.map(_.addToContext(ctx)))
+        (ctx, tail.map(_.setHeaderContext(ctx)))
       }
     }
   }
@@ -57,7 +57,7 @@ sealed trait DecodeRowsAs[+E <: RowFailure, A, +T] extends Any {
   }
 
   def usingHeaderInfo[R, E1 >: RowFailure](
-    rows: ZStream[R, E1, Row[Has[HeaderCtx]]],
+    rows: ZStream[R, E1, Row[Any]],
   )(implicit decoder: RowDecoder.FromHeaderInfo[A]): ZStream[R, E1, T] = {
     val readHeaderThenAllRows = CsvDecoder.readHeaderInfo(rows).map {
       case Some((header, dataRows)) =>

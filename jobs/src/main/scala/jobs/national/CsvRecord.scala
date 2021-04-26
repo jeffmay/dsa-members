@@ -69,13 +69,6 @@ object CsvRecord extends CommonDecoders {
   implicit val decodeAkID: CellDecoder[AkID] =
     CellDecoder.fromStringTotal(AkID(_))
 
-  implicit val decodeNoHeader: RowDecoder.FromPositionOnly[AkID] = { row =>
-    row
-    for {
-      akId <- row(1).as[AkID]
-    } yield akId
-  }
-
   implicit val decodeWithHeaders: RowDecoder.FromHeaderInfo[CsvRecord] = {
     row =>
       for {
