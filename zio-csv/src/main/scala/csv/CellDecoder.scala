@@ -2,6 +2,7 @@ package zio
 package csv
 
 import enumeratum.ops.EnumCodec
+import zio.stream.{ZSink, ZStream}
 
 import java.time.{Instant, LocalDate, LocalDateTime, ZonedDateTime}
 import scala.collection.Factory
@@ -111,46 +112,62 @@ object CellDecoder {
     decoder: CellDecoder[A],
   ): CellDecoder[A] = decoder
 
-  def split(delimiter: Char): SplitString = new SplitString(_.split(delimiter))
+  def split(delimiter: Char): SplitString =
+    new SplitString(s =>
+      ArraySeq.unsafeWrapArray(s.split(delimiter)).filterNot(_.isEmpty),
+    )
 
-  def split(re: Regex): SplitString = new SplitString(re.split)
+  def split(re: Regex): SplitString =
+    new SplitString(s =>
+      ArraySeq.unsafeWrapArray(re.split(s)).filterNot(_.isEmpty),
+    )
 
   trait Split[A] extends Any {
 
-    protected def split: String => CellDecoder.Result[IndexedSeq[A]]
+    protected def split: String => ZStream[MinCtx, CellDecodingFailure, A]
 
     def to[C](factory: Factory[A, C]): CellDecoder[C] = {
-      content => split(content).map(_.to(factory))
+      content => split(content).run(ZSink.collectAll).map(_.to(factory))
     }
   }
 
-  final class SplitString(private val splitString: String => Array[String])
+  final class SplitString(private val splitString: String => Seq[String])
     extends Split[String] {
 
-    override protected val split: String => CellDecoder.Result[IndexedSeq[String]] = {
+    override protected val split: String => ZStream[
+      MinCtx,
+      CellDecodingFailure,
+      String,
+    ] = {
       // this is safe because the array is never mutated in this local scope
       // and all other references are to an immutable interface that copies
       // to a new array before allowing mutation.
       val decoder =
-        CellDecoder.fromStringSafe(s => ArraySeq.unsafeWrapArray(splitString(s)))
-      decoder.decodeString
+        CellDecoder.fromStringSafe(s => splitString(s))
+
+      // create a function from the string content into a stream of values from the iterable
+      content => ZStream.fromIterableM(decoder.decodeString(content))
     }
 
-    def as[A : CellDecoder]: Split[A] = new SplitMap[A](content => {
-      val strings = splitString(content)
-      ZIO.foldLeft(strings)(Vector.empty[A]) {
-        (acc, piece) =>
-          for {
-            res <- CellDecoder[A].decodeString(piece)
-          } yield acc :+ res
+    def as[A : CellDecoder]: SplitMap[A] = new SplitMap[A](content => {
+      split(content).mapM { piece =>
+        CellDecoder[A].decodeString(piece)
       }
     })
   }
 
   final class SplitMap[A](
-    override protected val split: String => CellDecoder.Result[IndexedSeq[A]],
+    override protected val split: String => ZStream[
+      MinCtx,
+      CellDecodingFailure,
+      A,
+    ],
   ) extends AnyVal
-    with Split[A]
+    with Split[A] {
+
+    def droppingErrors: SplitMap[A] =
+      new SplitMap[A](split.andThen(_.catchAll(_ => ZStream.empty)))
+  }
 
   implicit val string: CellDecoder[String] = ZIO.succeed(_)
 
