@@ -1,10 +1,8 @@
 package org.dsasf.members
 package database.models
 
-import eu.timepit.refined.boolean._
-import eu.timepit.refined.numeric._
+import eu.timepit.refined.predicates.all._
 import eu.timepit.refined._
-import eu.timepit.refined.string._
 import shapeless.tag.@@
 
 sealed trait PhoneNumber extends Any {
@@ -15,9 +13,10 @@ sealed trait PhoneNumber extends Any {
 object PhoneNumber {
 
   def parse(text: String): Either[String, PhoneNumber] = {
-    val stripped = NumericString(text)
-    DomesticPhoneNumber.fromNumericString(stripped).left.map { err =>
-      s"Unrecognized PhoneNumber format for '$text':\nX Domestic - $err"
+    NumericString.parse(text).flatMap { numeric =>
+      DomesticPhoneNumber.fromNumericString(numeric).left.map { err =>
+        s"Unrecognized PhoneNumber format for '$text':\nX Domestic - $err"
+      }
     }
   }
 }
@@ -52,7 +51,9 @@ object DomesticPhoneNumber {
   }
 
   def parse(text: String): Either[String, PhoneNumber] = {
-    fromNumericString(NumericString(text))
+    refineV[NonEmpty](text).flatMap { nonEmptyText =>
+      fromNumericString(NumericString(nonEmptyText))
+    }
   }
 
   def fromNumericString(stripped: NumericString): Either[

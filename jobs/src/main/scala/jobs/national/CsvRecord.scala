@@ -15,9 +15,9 @@ final case class CsvRecord(
   name: NameComponentsUsa,
   billingAddress: Address,
   mailingAddress: Address,
-  mobilePhone: Option[PhoneNumber],
-  homePhone: Option[PhoneNumber],
-  workPhone: Option[PhoneNumber],
+  mobilePhone: Seq[PhoneNumber],
+  homePhone: Seq[PhoneNumber],
+  workPhone: Seq[PhoneNumber],
   emailAddress: Option[EmailAddress],
   mailPreference: UnknownEntryOr[MailPreference],
   doNotCall: Boolean,
@@ -87,9 +87,9 @@ object CsvRecord extends CommonDecoders {
         mailingCity <- row(Keys.MAILING_CITY).asString
         mailingState <- row(Keys.MAILING_STATE).asString
         mailingZip <- row(Keys.MAILING_ZIP).asString
-        mobilePhone <- row(Keys.MOBILE_PHONE).as[Option[PhoneNumber]]
-        homePhone <- row(Keys.HOME_PHONE).as[Option[PhoneNumber]]
-        workPhone <- row(Keys.WORK_PHONE).as[Option[PhoneNumber]]
+        mobilePhone <- row(Keys.MOBILE_PHONE).as[Seq[PhoneNumber]]
+        homePhone <- row(Keys.HOME_PHONE).as[Seq[PhoneNumber]]
+        workPhone <- row(Keys.WORK_PHONE).as[Seq[PhoneNumber]]
         emailAddress <- row(Keys.EMAIL).as[Option[EmailAddress]]
         mailPreference <-
           row(Keys.MAIL_PREFERENCE).as[UnknownEntryOr[MailPreference]]
