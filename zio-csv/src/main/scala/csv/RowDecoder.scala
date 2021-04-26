@@ -2,7 +2,7 @@ package zio
 package csv
 
 trait RowDecoder[-R, A] {
-  def decode(row: Row): RowDecoder.Result[R, A]
+  def decode(row: Row[R]): RowDecoder.Result[R, A]
 }
 
 object RowDecoder {
@@ -31,7 +31,7 @@ object RowDecoder {
   implicit class FromHeaderOps[A](private val decoder: FromHeaderInfo[A])
     extends AnyVal {
     def withFixedHeader(header: HeaderCtx): FromPositionOnly[A] = { row =>
-      decoder.decode(row).provide(Has(header))
+      decoder.decode(row.addToContext(header)).provide(Has(header))
     }
   }
 

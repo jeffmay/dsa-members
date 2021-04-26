@@ -63,10 +63,16 @@ final case class RowInvalidSyntax(
   */
 sealed abstract class DecodingFailure(
   override val rowIndex: Long,
+  maybeColumnIndex: Option[Int],
+  maybeColumnName: Option[String],
   val reason: String,
   cause: Option[Throwable],
 ) extends Exception(
-    s"Decoding failure at row $rowIndex: $reason",
+    {
+      val columnNumber = maybeColumnIndex.fold("unknown")(i => "" + (i + 1))
+      val columnName = maybeColumnName.fold("[unknown]")(n => s"['$n']")
+      s"Decoding failure at row=${rowIndex + 1}, column=$columnNumber $columnName: $reason"
+    },
     cause.orNull,
   )
   with RowFailure
@@ -79,6 +85,8 @@ final case class InvalidColumnName(
   expectedColumnName: String,
 ) extends DecodingFailure(
     rowIndex,
+    None,
+    None,
     s"Expected a header column named '$expectedColumnName'",
     None,
   )
@@ -91,6 +99,8 @@ final case class InvalidColumnIndex(
   expectedColumnIndex: Int,
 ) extends DecodingFailure(
     rowIndex,
+    None,
+    None,
     s"Expected at least ${expectedColumnIndex + 1} columns",
     None,
   )
@@ -104,35 +114,42 @@ sealed trait CellDecodingFailure extends DecodingFailure {
 
 object CellDecodingFailure {
 
-  /** Create [[CellDecodingFailure]] without a known type using the [[CellDecoder.MinCtx]] and the given message.
-    */
-  def fromMessage(reason: String): URIO[
-    CellDecoder.MinCtx,
-    CellDecodingFailure,
-  ] = {
-    ZIO.services[RowCtx, CellCtx].map { case (row, cell) =>
-      GenericCellDecodingFailure(
+  @inline def buildFromContextValues[F](
+    build: (Long, Int, Option[String]) => F,
+  ): URIO[CellDecoder.MinCtx, F] = {
+    buildFromContext { (row, cell) =>
+      build(
         row.rowIndex,
         cell.columnIndex,
-        reason,
+        cell.columnName,
       )
+    }
+  }
+
+  @inline def buildFromContext[F](
+    build: (RowCtx, CellCtx) => F,
+  ): URIO[CellDecoder.MinCtx, F] = {
+    ZIO.services[RowCtx, CellCtx].map(build.tupled)
+  }
+
+  /** Create [[CellDecodingFailure]] without a known type using the [[CellDecoder.MinCtx]] and the given message.
+    */
+  def fromMessage(
+    reason: String,
+  ): URIO[CellDecoder.MinCtx, CellDecodingFailure] = {
+    buildFromContextValues {
+      GenericCellDecodingFailure(_, _, _, reason)
     }
   }
 
   /** Convert an exception into a [[CellDecodingException]] of a given type using the [[CellDecoder.MinCtx]].
     */
-  def fromExceptionDecodingAs[A : Tag](cause: Throwable): URIO[
-    CellDecoder.MinCtx,
-    CellDecodingTypedFailure[A],
-  ] = {
-    ZIO.services[RowCtx, CellCtx].map { case (row, cell) =>
-      CellDecodingException[A](
-        row.rowIndex,
-        cell.columnIndex,
-        cause,
-      )
+  def fromExceptionDecodingAs[A : Tag](
+    cause: Throwable,
+  ): URIO[CellDecoder.MinCtx, CellDecodingTypedFailure[A]] =
+    buildFromContextValues {
+      CellDecodingException[A](_, _, _, cause)
     }
-  }
 }
 
 /** A generic error occurred while decoding a [[Cell]] into some expected result.
@@ -146,9 +163,15 @@ object CellDecodingFailure {
 final case class GenericCellDecodingFailure(
   override val rowIndex: Long,
   columnIndex: Int,
+  maybeColumnName: Option[String],
   override val reason: String,
-//  accumulated: IndexedSeq[CellDecodingFailure] = IndexedSeq(),
-) extends DecodingFailure(rowIndex, reason, None)
+) extends DecodingFailure(
+    rowIndex,
+    Some(columnIndex),
+    maybeColumnName,
+    reason,
+    None,
+  )
   with CellDecodingFailure
 
 /** A [[CellDecodingFailure]] with a known expected type.
@@ -165,10 +188,13 @@ sealed trait CellDecodingTypedFailure[A] extends CellDecodingFailure {
 final case class CellDecodingException[A : Tag](
   override val rowIndex: Long,
   columnIndex: Int,
+  maybeColumnName: Option[String],
   cause: Throwable,
 ) extends DecodingFailure(
     rowIndex,
-    s"Expected cell at column ${columnIndex + 1} to be of type ${Tag[A].tag}. Caused by:\n$cause",
+    Some(columnIndex),
+    maybeColumnName,
+    s"Expected cell to be of type ${Tag[A].tag}. Caused by:\n$cause",
     None, // the exception is already printed as part of this message
   )
   with CellDecodingTypedFailure[A] {
@@ -189,11 +215,14 @@ final case class CellDecodingException[A : Tag](
 sealed abstract class CellInvalidFormat[A : Tag](
   rowIndex: Long,
   columnIndex: Int,
+  maybeColumnName: Option[String],
   patternType: String,
   expectedPattern: String,
 ) extends DecodingFailure(
     rowIndex,
-    s"Expected cell at column index=$columnIndex to match the following $patternType:\n$expectedPattern",
+    Some(columnIndex),
+    maybeColumnName,
+    s"Expected cell to match the following $patternType:\n$expectedPattern",
     None,
   )
   with CellDecodingTypedFailure[A] {
@@ -210,13 +239,16 @@ object CellInvalidFormat {
 final case class CellInvalidUnmatchedRegex[A : Tag](
   override val rowIndex: Long,
   columnIndex: Int,
+  maybeColumnName: Option[String],
   expectedPattern: Regex,
 ) extends CellInvalidFormat[A](
     rowIndex,
     columnIndex,
+    maybeColumnName,
     CellInvalidFormat.RegexPatternType,
     expectedPattern.pattern.pattern,
   ) {
+
   override def withNewExpectedType[B : Tag]: CellDecodingTypedFailure[B] =
     copy[B]()
 }

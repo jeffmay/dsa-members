@@ -12,7 +12,7 @@ object Cell {
   /** Creates an [[Env]] containing 1 row and 1 column where the 1 cell contains the given content.
     */
   def detachedEnv(content: String): Env =
-    Has(RowCtx(1, Vector(content))).add(CellCtx(0, content))
+    Has(RowCtx(1, Vector(content))).add(CellCtx(0, None, content))
 
   def fromEffect[R](
     result: ZIO[R, DecodingFailure, Env],

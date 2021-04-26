@@ -4,7 +4,13 @@ package jobs.national
 import com.github.tototoshi.csv.CSVFormat
 import zio.URIO
 import zio.blocking.Blocking
-import zio.csv.{CsvDecoder, CsvParser, ReadingFailure}
+import zio.csv.{
+  CsvDecoder,
+  CsvParser,
+  DecodingFailure,
+  ParsingFailure,
+  ReadingFailure,
+}
 import zio.stream.{ZSink, ZStream}
 
 import java.nio.file.Path
@@ -12,15 +18,24 @@ import java.nio.file.Path
 object ImportNationalMembership {
 
   final case class ImportResults(
-    successes: Long = 0,
-    failures: Long = 0,
+    successCount: Long = 0,
+    allFailures: Vector[ReadingFailure] = Vector.empty,
   ) {
 
+    lazy val decodingFailures: Vector[DecodingFailure] = allFailures.collect {
+      case f: DecodingFailure => f
+    }
+
+    lazy val parsingFailures: Vector[ParsingFailure] = allFailures.collect {
+      case f: ParsingFailure => f
+    }
+
     def recordSuccess(record: CsvRecord): ImportResults =
-      copy(successes = this.successes + 1)
+      copy(successCount = this.successCount + 1)
 
     def recordFailure(failure: ReadingFailure): ImportResults =
-      copy(failures = this.failures + 1)
+      copy(allFailures = allFailures :+ failure)
+
   }
 
   final case class ImportFailed(
@@ -33,8 +48,8 @@ object ImportNationalMembership {
   ): URIO[Blocking, ImportResults] = {
     val reader = CsvParser.fromFile(path, format)
     val decodeRecords =
-      CsvDecoder.decodeRowsAs[CsvRecord].usingHeaderInfo(reader)
-    decodeRecords.map(Right(_)).catchAll(f => ZStream.succeed(Left(f))).run {
+      CsvDecoder.decodeRowsAsEitherFailureOr[CsvRecord].usingHeaderInfo(reader)
+    decodeRecords.catchAll(f => ZStream.succeed(Left(f))).run {
       ZSink.foldLeft(ImportResults()) {
         case (res, Left(failure)) =>
           res.recordFailure(failure)

@@ -1,8 +1,6 @@
 package zio
 package csv
 
-import csv.CellDecoder.MinCtx
-
 import enumeratum.ops.EnumCodec
 
 import java.time.{Instant, LocalDate, LocalDateTime, ZonedDateTime}
@@ -15,7 +13,11 @@ trait CellDecoder[A] {
 
   /** Decode the given cell contents into the expected type or return a [[CellDecodingFailure]].
     */
-  def decodeString(content: String): ZIO[MinCtx, CellDecodingFailure, A]
+  def decodeString(content: String): ZIO[
+    CellDecoder.MinCtx,
+    CellDecodingFailure,
+    A,
+  ]
 
   /** Decode the given [[Cell]] into the expected type or return a [[CellDecodingFailure]].
     */
@@ -45,12 +47,8 @@ trait CellDecoder[A] {
         ZIO.fromTry(Try(fn(a))).flatMap { decodeB =>
           decodeB.decodeString(content)
         }.flatMapError { ex =>
-          ZIO.services[RowCtx, CellCtx].map { case (row, cell) =>
-            CellDecodingException[B](
-              row.rowIndex,
-              cell.columnIndex,
-              ex,
-            )
+          CellDecodingFailure.buildFromContextValues {
+            CellDecodingException[B](_, _, _, ex)
           }
         }
       }
@@ -91,12 +89,8 @@ trait CellDecoder[A] {
   final def mapSafe[B : Tag](fn: A => B): CellDecoder[B] = { content =>
     decodeString(content).flatMap { a =>
       ZIO.fromTry(Try(fn(a))).flatMapError { ex =>
-        ZIO.services[RowCtx, CellCtx].map { case (row, cell) =>
-          CellDecodingException[B](
-            row.rowIndex,
-            cell.columnIndex,
-            ex,
-          )
+        CellDecodingFailure.buildFromContextValues {
+          CellDecodingException[B](_, _, _, ex)
         }
       }
     }
@@ -245,12 +239,8 @@ object CellDecoder {
   def fromStringSafe[A : Tag](convert: String => A): CellDecoder[A] = { str =>
     ZIO(convert(str))
       .flatMapError { ex =>
-        ZIO.services[RowCtx, CellCtx].map { case (row, cell) =>
-          CellDecodingException[A](
-            row.rowIndex,
-            cell.columnIndex,
-            ex,
-          )
+        CellDecodingFailure.buildFromContextValues {
+          CellDecodingException[A](_, _, _, ex)
         }
       }
   }
@@ -270,12 +260,8 @@ object CellDecoder {
   def matchesRegex(re: Regex): CellDecoder[String] = fromEffect { str =>
     ZIO.fromOption(Option.when(re.matches(str))(str))
       .flatMapError { _ =>
-        ZIO.services[RowCtx, CellCtx].map { case (row, cell) =>
-          CellInvalidUnmatchedRegex[String](
-            row.rowIndex,
-            cell.columnIndex,
-            re,
-          )
+        CellDecodingFailure.buildFromContextValues {
+          CellInvalidUnmatchedRegex[String](_, _, _, re)
         }
       }
   }
@@ -285,12 +271,8 @@ object CellDecoder {
       val ll = LazyList.from(re.findAllMatchIn(str))
       ZIO.fromOption(Option.unless(ll.isEmpty)(ll))
         .flatMapError { _ =>
-          ZIO.services[RowCtx, CellCtx].map { case (row, cell) =>
-            CellInvalidUnmatchedRegex[Iterable[Regex.Match]](
-              row.rowIndex,
-              cell.columnIndex,
-              re,
-            )
+          CellDecodingFailure.buildFromContextValues {
+            CellInvalidUnmatchedRegex[Iterable[Regex.Match]](_, _, _, re)
           }
         }
     }

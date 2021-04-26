@@ -26,7 +26,7 @@ object RunJob extends App {
 //      console <- ZIO.service[Console.Service]
 //      _ <- console.putStrLn("Hello. What file do you want to process?")
 //      filename <- console.getStrLn.orDie
-      count <- ImportNationalMembership.fromCsvFile(
+      rs <- ImportNationalMembership.fromCsvFile(
         Paths.get(
           "tmp",
           "dsasf-2021-03-21.csv",
@@ -34,7 +34,7 @@ object RunJob extends App {
         CsvFormat.Default,
       )
       _ <- console.putStrLn(
-        s"Total successes: ${count.successes}, failures: ${count.failures}",
+        s"Total successes: ${rs.successCount}, failures:\n${rs.allFailures.mkString("\n")}",
       )
     } yield ExitCode.success
   }

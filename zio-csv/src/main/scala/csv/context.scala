@@ -1,13 +1,24 @@
 package zio
 package csv
 
-final case class HeaderCtx(columns: Map[String, Int])
+final case class HeaderCtx(headerRow: IndexedSeq[String]) {
+
+  lazy val columnIndexByName: Map[String, Int] =
+    headerRow.zip(headerRow.indices).toMap
+
+  lazy val columnNameByIndex: Map[Int, String] =
+    headerRow.indices.zip(headerRow).toMap
+}
 
 object HeaderCtx {
-  def fromRow(headerRow: Row): HeaderCtx =
-    new HeaderCtx(headerRow.cells.zipWithIndex.toMap)
+  def fromCells(headerRow: IndexedSeq[String]): HeaderCtx =
+    new HeaderCtx(headerRow)
 }
 
 final case class RowCtx(rowIndex: Long, cells: IndexedSeq[String])
 
-final case class CellCtx(columnIndex: Int, content: String)
+final case class CellCtx(
+  columnIndex: Int,
+  columnName: Option[String],
+  content: String,
+)
