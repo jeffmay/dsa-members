@@ -36,7 +36,7 @@ trait CommonDecoders {
     }
 
   implicit val decodeSeqPhoneNumber: CellDecoder[Seq[PhoneNumber]] =
-    CellDecoder.split(',').as[PhoneNumber].to(Vector)
+    CellDecoder.split(',').as[PhoneNumber].skipFailures.to(Vector)
 
   implicit val decodeEmailAddress: CellDecoder[EmailAddress] =
     CellDecoder.fromStringSafe { content =>

@@ -22,6 +22,8 @@ object ImportNationalMembership {
     allFailures: Vector[ReadingFailure] = Vector.empty,
   ) {
 
+    def failureCount: Long = allFailures.size
+
     lazy val decodingFailures: Vector[DecodingFailure] = allFailures.collect {
       case f: DecodingFailure => f
     }

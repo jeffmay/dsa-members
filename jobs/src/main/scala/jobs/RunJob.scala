@@ -33,8 +33,8 @@ object RunJob extends App {
         ),
         CsvFormat.Default,
       )
-      _ <- console.putStrLn(
-        s"Total successes: ${rs.successCount}, failures:\n${rs.allFailures.mkString("\n")}",
+      _ <- console.putStr(
+        s"Total successes: ${rs.successCount}, failures: ${rs.failureCount}\n${rs.allFailures.mkString("\n")}",
       )
     } yield ExitCode.success
   }
