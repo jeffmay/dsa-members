@@ -112,15 +112,22 @@ object CellDecoder {
     decoder: CellDecoder[A],
   ): CellDecoder[A] = decoder
 
-  def split(delimiter: Char): SplitString =
-    new SplitString(s =>
-      ArraySeq.unsafeWrapArray(s.split(delimiter)).filterNot(_.isEmpty),
-    )
+  @inline def split(delimiter: Char): SplitString =
+    split(delimiter, keepEmpty = true)
 
-  def split(re: Regex): SplitString =
-    new SplitString(s =>
-      ArraySeq.unsafeWrapArray(re.split(s)).filterNot(_.isEmpty),
-    )
+  def split(delimiter: Char, keepEmpty: Boolean): SplitString = {
+    val adjust: Seq[String] => Seq[String] =
+      if (keepEmpty) identity else _.filterNot(_.isEmpty)
+    new SplitString(s => adjust(ArraySeq.unsafeWrapArray(s.split(delimiter))))
+  }
+
+  @inline def split(re: Regex): SplitString = split(re, keepEmpty = true)
+
+  def split(re: Regex, keepEmpty: Boolean): SplitString = {
+    val adjust: Seq[String] => Seq[String] =
+      if (keepEmpty) identity else _.filterNot(_.isEmpty)
+    new SplitString(s => adjust(ArraySeq.unsafeWrapArray(re.split(s))))
+  }
 
   trait Split[A] extends Any {
 
