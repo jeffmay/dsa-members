@@ -133,6 +133,9 @@ object CellDecoder {
 
     protected def split: String => ZStream[MinCtx, CellDecodingFailure, A]
 
+    def skipFailures: SplitMap[A] =
+      new SplitMap[A](split.andThen(_.catchAll(_ => ZStream.empty)))
+
     def to[C](factory: Factory[A, C]): CellDecoder[C] = {
       content => split(content).run(ZSink.collectAll).map(_.to(factory))
     }
@@ -170,11 +173,7 @@ object CellDecoder {
       A,
     ],
   ) extends AnyVal
-    with Split[A] {
-
-    def droppingErrors: SplitMap[A] =
-      new SplitMap[A](split.andThen(_.catchAll(_ => ZStream.empty)))
-  }
+    with Split[A]
 
   implicit val string: CellDecoder[String] = ZIO.succeed(_)
 
