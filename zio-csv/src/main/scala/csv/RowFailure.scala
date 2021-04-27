@@ -180,6 +180,25 @@ final case class GenericCellDecodingFailure(
   )
   with CellDecodingFailure
 
+/**
+  */
+final case class CombinedCellDecodingFailure(
+  override val rowIndex: Long,
+  columnIndex: Int,
+  maybeColumnName: Option[String],
+  separator: String,
+  failuresByKey: Map[String, CellDecodingFailure],
+) extends DecodingFailure(
+    rowIndex,
+    Some(columnIndex),
+    maybeColumnName, {
+      val failures = failuresByKey.map { case (k, v) => s"$k = ${v.reason}" }
+      s"Accumulated multiple failures from cell (separated by $separator):\n${failures.mkString("\n")}"
+    },
+    None,
+  )
+  with CellDecodingFailure
+
 /** A [[CellDecodingFailure]] with a known expected type.
   * @see [[ReadingFailure]]
   */

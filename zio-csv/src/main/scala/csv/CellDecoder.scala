@@ -5,7 +5,7 @@ import enumeratum.ops.EnumCodec
 import zio.stream.{ZSink, ZStream}
 
 import java.time.{Instant, LocalDate, LocalDateTime, ZonedDateTime}
-import scala.collection.Factory
+import scala.collection.{mutable, Factory}
 import scala.collection.immutable.ArraySeq
 import scala.util.Try
 import scala.util.matching.Regex
@@ -113,65 +113,95 @@ object CellDecoder {
   ): CellDecoder[A] = decoder
 
   @inline def split(delimiter: Char): SplitString =
-    split(delimiter, keepEmpty = true)
+    split(delimiter, keepEmpty = false)
 
   def split(delimiter: Char, keepEmpty: Boolean): SplitString = {
-    val adjust: Seq[String] => Seq[String] =
+    val adjust: ArraySeq[String] => ArraySeq[String] =
       if (keepEmpty) identity else _.filterNot(_.isEmpty)
-    new SplitString(s => adjust(ArraySeq.unsafeWrapArray(s.split(delimiter))))
+    new SplitString(
+      s"'$delimiter'",
+      s => adjust(ArraySeq.unsafeWrapArray(s.split(delimiter))),
+    )
   }
 
-  @inline def split(re: Regex): SplitString = split(re, keepEmpty = true)
+  @inline def split(re: Regex): SplitString = split(re, keepEmpty = false)
 
   def split(re: Regex, keepEmpty: Boolean): SplitString = {
-    val adjust: Seq[String] => Seq[String] =
+    val adjust: ArraySeq[String] => ArraySeq[String] =
       if (keepEmpty) identity else _.filterNot(_.isEmpty)
-    new SplitString(s => adjust(ArraySeq.unsafeWrapArray(re.split(s))))
+    new SplitString(
+      s""""$re".r""",
+      s => adjust(ArraySeq.unsafeWrapArray(re.split(s))),
+    )
   }
 
-  trait Split[A] extends Any {
+  sealed trait Split[A] extends Any {
 
-    protected def split: String => ZStream[MinCtx, CellDecodingFailure, A]
-
-    def skipFailures: SplitMap[A] =
-      new SplitMap[A](split.andThen(_.catchAll(_ => ZStream.empty)))
+    protected def split: String => CellDecoder.Result[Iterable[A]]
 
     def to[C](factory: Factory[A, C]): CellDecoder[C] = {
-      content => split(content).run(ZSink.collectAll).map(_.to(factory))
+      content => split(content).map(_.to(factory))
     }
   }
 
-  final class SplitString(private val splitString: String => Seq[String])
-    extends Split[String] {
+  final class SplitString(
+    separator: String,
+    splitString: String => IndexedSeq[String],
+  ) extends Split[String] {
 
-    override protected val split: String => ZStream[
-      MinCtx,
-      CellDecodingFailure,
-      String,
-    ] = {
-      // this is safe because the array is never mutated in this local scope
-      // and all other references are to an immutable interface that copies
-      // to a new array before allowing mutation.
+    override protected val split: String => CellDecoder.Result[IndexedSeq[String]] = {
       val decoder =
         CellDecoder.fromStringSafe(s => splitString(s))
-
-      // create a function from the string content into a stream of values from the iterable
-      content => ZStream.fromIterableM(decoder.decodeString(content))
+      // create a function from the safe decoder
+      decoder.decodeString
     }
 
-    def as[A : CellDecoder]: SplitMap[A] = new SplitMap[A](content => {
-      split(content).mapM { piece =>
-        CellDecoder[A].decodeString(piece)
-      }
-    })
+    def as[A : CellDecoder]: SplitAs[A] = new SplitAs[A](
+      separator,
+      content => {
+        split(content).flatMap { pieces =>
+          val results = pieces.map(s => CellDecoder[A].decodeString(s).either)
+          ZIO.mergeAll(results)(Vector.empty[Either[CellDecodingFailure, A]]) {
+            (acc, next) => acc :+ next
+          }
+        }
+      },
+    )
   }
 
-  final class SplitMap[A](
-    override protected val split: String => ZStream[
-      MinCtx,
+  final class SplitAs[A](
+    separator: String,
+    split: String => CellDecoder.Result[Iterable[Either[
       CellDecodingFailure,
       A,
-    ],
+    ]]],
+  ) {
+
+    def skipFailures: SplitValidated[A] = new SplitValidated[A](
+      split(_).map(_.collect {
+        case Right(a) => a
+      }),
+    )
+
+    def combineFailures: SplitValidated[A] = new SplitValidated[A](
+      split(_).flatMap { results =>
+        val (failures, successes) = results.zipWithIndex.partitionMap {
+          case (Right(a), _) => Right(a)
+          case (Left(e), idx) => Left((s"cell[$idx]", e))
+        }
+        if (failures.isEmpty) ZIO.succeed(successes)
+        else CellDecodingFailure.buildFromContextValues {
+          CombinedCellDecodingFailure(_, _, _, separator, failures.toMap)
+        }.flip
+      },
+    )
+
+    def either: SplitValidated[Either[CellDecodingFailure, A]] =
+      new SplitValidated(split)
+  }
+
+  final class SplitValidated[A](
+    override protected val split: String => CellDecoder.Result[Iterable[A]],
   ) extends AnyVal
     with Split[A]
 
@@ -240,8 +270,11 @@ object CellDecoder {
     final override def toString: String = s"CellDecoder.const($value)"
   }
 
-  def fail[A](failure: CellDecodingFailure): CellDecoder[A] =
-    failWith(_ => ZIO.succeed(failure))
+  def fail[A](failure: URIO[
+    CellDecoder.MinCtx,
+    CellDecodingFailure,
+  ]): CellDecoder[A] =
+    failWith(_ => failure)
 
   def failWith[A](failWith: String => URIO[
     CellDecoder.MinCtx,
