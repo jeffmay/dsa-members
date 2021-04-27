@@ -61,10 +61,12 @@ object DomesticPhoneNumber {
     DomesticPhoneNumber,
   ] = {
     val result = stripped.value match {
-      case s if s.length == 10 =>
-        refineT[DomesticPhoneNumber.Compact](s.toLong)
-      case s if s.length == 11 && s.charAt(0) == '1' =>
-        refineT[DomesticPhoneNumber.Compact](s.toLong % MinLong)
+      case s if (10 to 11).contains(s.length) =>
+        val localized = if (s.charAt(0) == '1') s.toLong % MinLong else s.toLong
+        refineT[DomesticPhoneNumber.Compact](localized).left.map { _ =>
+          "Expected a string with 10 digits (not starting with '0') " +
+            "OR 11 digits (starting with the USA country code, '1', but not followed by a '0')"
+        }
       case _ =>
         Left("Expected a string with 10 digits")
     }
