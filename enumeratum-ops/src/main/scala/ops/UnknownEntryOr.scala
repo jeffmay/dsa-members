@@ -1,9 +1,6 @@
-package org.dsasf.members
-package jobs
+package enumeratum.ops
 
-import enumeratum.ops.{EnumCodec, NoSuchMember}
-
-/** A helpful wrapper around an Either from the [[IsEnum]] for when you want to
+/** A helpful wrapper around an Either from the [[EnumCodec]] for when you want to
   * handle unknown enum value names without losing the ability to throw the
   * original error.
   */
@@ -25,8 +22,10 @@ final case class UnknownEntryOr[E](
 
 object UnknownEntryOr {
 
-  def apply[E : EnumCodec]: Builder[E] =
-    new Builder[E](str => NoSuchMember(EnumCodec[E].valueNames, str))
+  def apply[E : EnumCodec]: Builder[E] = {
+    val enum = EnumCodec[E]
+    new Builder[E](str => NoSuchMember(enum.enumName, enum.valueNames, str))
+  }
 
   final class Builder[E](private val buildException: String => NoSuchMember)
     extends AnyVal {

@@ -1,9 +1,10 @@
 package enumeratum
 package ops
 
-import values.{ValueEnum, ValueEnumEntry}
+import values.{NoSuchMember => _, _}
 
 import scala.annotation.implicitNotFound
+import scala.collection.immutable.ArraySeq
 
 /** Defines generic operations for extracting and serializing enum values to and from strings.
   *
@@ -11,6 +12,10 @@ import scala.annotation.implicitNotFound
   */
 @implicitNotFound("Cannot find implicit EnumCodec[${E}]. Does the companion object extend EnumCompanion[${E}]?")
 trait EnumCodec[E] {
+
+  /** Name of the enumeration.
+    */
+  def enumName: String
 
   /** The list of all possible enum values
     */
@@ -24,14 +29,14 @@ trait EnumCodec[E] {
 
   /** Finds the enum value for the given name with case insensitivity.
     */
-  def findByNameInsensitiveOpt(name: String): Option[E]
+  protected def findByNameInsensitiveOpt(name: String): Option[E]
 
   /** Finds the enum value for the given name with case insensitivity or returns an error.
     */
-  def findByNameInsensitiveEither(name: String): Either[NoSuchMember, E] = {
-    findByNameInsensitiveOpt(name).toRight {
-      NoSuchMember(valueNames, name)
-    }
+  def findByNameInsensitive(name: String): UnknownEntryOr[E] = {
+    UnknownEntryOr(findByNameInsensitiveOpt(name).toRight {
+      NoSuchMember(enumName, valueNames, name)
+    })
   }
 
   /** The names for all the values in the enumeration.
@@ -50,27 +55,41 @@ object EnumCodec {
 
   @inline def apply[E : EnumCodec]: EnumCodec[E] = implicitly
 
-  def fromEnum[E <: EnumEntry](
-    enum: Enum[E],
-  ): EnumCodec[E] =
+  private def enumeratumName(cls: Class[_]): String = {
+    val n = cls.getName
+    val parts = ArraySeq.unsafeWrapArray(n.split(Array('$', '.')))
+    parts.dropWhile(_.charAt(0).isLower).mkString(".")
+  }
+
+  def nameOfEnum(enum: Enum[_]): String = enumeratumName(enum.getClass)
+
+  def nameOfEnum(enum: ValueEnum[_, _]): String = enumeratumName(enum.getClass)
+
+  def fromEnum[E <: EnumEntry](e: Enum[E]): EnumCodec[E] =
     new EnumCodec[E] {
-      final override def values: IndexedSeq[E] = enum.values
+      final override val enumName: String = nameOfEnum(e)
+      final override def values: IndexedSeq[E] = e.values
       final override def nameOf(entry: E): String = entry.entryName
-      final override def findByNameInsensitiveOpt(name: String): Option[E] =
-        enum.withNameInsensitiveOption(name)
+      final override protected def findByNameInsensitiveOpt(
+        name: String,
+      ): Option[E] =
+        e.withNameInsensitiveOption(name)
     }
 
-  def fromEnum[E <: ValueEnumEntry[V], V](
-    enum: ValueEnum[V, E],
+  def fromValueEnum[E <: ValueEnumEntry[V], V](
+    e: ValueEnum[V, E],
   ): EnumCodec[E] =
     new EnumCodec[E] {
+      final override val enumName: String = nameOfEnum(e)
       final private[this] lazy val lookupLowerCase =
-        enum.valuesToEntriesMap.map { case (k, v) =>
+        e.valuesToEntriesMap.map { case (k, v) =>
           (k.toString.toLowerCase, v)
         }
-      final override def values: IndexedSeq[E] = enum.values
+      final override def values: IndexedSeq[E] = e.values
       final override def nameOf(entry: E): String = entry.value.toString
-      final override def findByNameInsensitiveOpt(str: String): Option[E] =
+      final override protected def findByNameInsensitiveOpt(
+        str: String,
+      ): Option[E] =
         lookupLowerCase.get(str.toLowerCase)
     }
 }

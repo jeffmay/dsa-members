@@ -1,16 +1,14 @@
 package org.dsasf.members
 package database.models.national
 
-import enumeratum.ops.{EnumCodec, EnumCompanion}
+import enumeratum.ops.ValueEnumCompanion
 import enumeratum.values.{StringEnum, StringEnumEntry}
 
 sealed abstract class MembershipType(override val value: String)
   extends StringEnumEntry
 
 object MembershipType
-  extends EnumCompanion[MembershipType] with StringEnum[MembershipType] {
-  implicit override val codec: EnumCodec[MembershipType] =
-    EnumCodec.fromEnum(this)
+  extends ValueEnumCompanion[MembershipType] with StringEnum[MembershipType] {
   override val values: IndexedSeq[MembershipType] = findValues
 
   final case object Monthly extends MembershipType("monthly")

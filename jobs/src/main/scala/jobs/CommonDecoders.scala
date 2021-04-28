@@ -3,7 +3,7 @@ package jobs
 
 import database.models.{EmailAddress, PhoneNumber}
 
-import enumeratum.ops.EnumCodec
+import enumeratum.ops.{EnumCodec, UnknownEntryOr}
 import zio.ZIO
 import zio.csv.{CellDecoder, CellDecodingFailure}
 
@@ -20,11 +20,7 @@ trait CommonDecoders {
   ]: CellDecoder[
     UnknownEntryOr[E],
   ] = CellDecoder.fromStringTotal { str =>
-    EnumCodec[E].findByNameInsensitiveOpt(str).map { entry =>
-      UnknownEntryOr[E].fromKnown(entry)
-    }.getOrElse {
-      UnknownEntryOr[E].fromUnknown(str)
-    }
+    EnumCodec[E].findByNameInsensitive(str)
   }
 
   implicit val decodePhoneNumber: CellDecoder[PhoneNumber] =

@@ -1,16 +1,14 @@
 package org.dsasf.members
 package database.models.national
 
-import enumeratum.ops.{EnumCodec, EnumCompanion}
+import enumeratum.ops.ValueEnumCompanion
 import enumeratum.values.{StringEnum, StringEnumEntry}
 
 sealed abstract class MailPreference(override val value: String)
   extends StringEnumEntry
 
 object MailPreference
-  extends EnumCompanion[MailPreference] with StringEnum[MailPreference] {
-  implicit override val codec: EnumCodec[MailPreference] =
-    EnumCodec.fromEnum(this)
+  extends ValueEnumCompanion[MailPreference] with StringEnum[MailPreference] {
   override val values: IndexedSeq[MailPreference] = findValues
 
   final case object MemberCardOnly

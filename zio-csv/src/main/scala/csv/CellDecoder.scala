@@ -257,7 +257,7 @@ object CellDecoder {
     */
   implicit def fromEnum[E : EnumCodec : Tag]: CellDecoder[E] = { cell =>
     ZIO.fromEither {
-      EnumCodec[E].findByNameInsensitiveEither(cell)
+      EnumCodec[E].findByNameInsensitive(cell).toEither
     }.flatMapError {
       CellDecodingFailure.fromExceptionDecodingAs[E](_)
     }
