@@ -3,13 +3,12 @@ package jobs.national
 
 import database.models.national._
 import database.models.{Address, EmailAddress, NameComponentsUsa, PhoneNumber}
-import jobs.{national, CommonDecoders, UnknownEntryOr}
+import jobs.{national, CommonDecoders}
 
 import zio.csv.{CellDecoder, RowDecoder}
 
 import java.time.LocalDate
 
-// TODO: Handle empty strings at the type-level
 final case class CsvRecord(
   akId: AkID,
   name: NameComponentsUsa,
@@ -19,13 +18,13 @@ final case class CsvRecord(
   homePhone: Seq[PhoneNumber],
   workPhone: Seq[PhoneNumber],
   emailAddress: Option[EmailAddress],
-  mailPreference: UnknownEntryOr[MailPreference],
+  mailPreference: MailPreference,
   doNotCall: Boolean,
   joinDate: LocalDate,
   expiryDate: LocalDate,
-  membershipType: UnknownEntryOr[MembershipType],
-  monthlyDuesStatus: UnknownEntryOr[MonthlyDuesStatus],
-  membershipStatus: UnknownEntryOr[MembershipStatus],
+  membershipType: Option[MembershipType],
+  monthlyDuesStatus: MonthlyDuesStatus,
+  membershipStatus: MembershipStatus,
 )
 
 object CsvRecord extends CommonDecoders {
@@ -92,16 +91,16 @@ object CsvRecord extends CommonDecoders {
         workPhone <- row(Keys.WORK_PHONE).as[Seq[PhoneNumber]]
         emailAddress <- row(Keys.EMAIL).as[Option[EmailAddress]]
         mailPreference <-
-          row(Keys.MAIL_PREFERENCE).as[UnknownEntryOr[MailPreference]]
+          row(Keys.MAIL_PREFERENCE).as[MailPreference]
         doNotCall <- row(Keys.DO_NOT_CALL).as[Boolean]
         joinDate <- row(Keys.JOIN_DATE).as[LocalDate]
         expiryDate <- row(Keys.EXPIRY_DATE).as[LocalDate]
         membershipType <-
-          row(Keys.MEMBERSHIP_TYPE).as[UnknownEntryOr[MembershipType]]
+          row(Keys.MEMBERSHIP_TYPE).as[Option[MembershipType]]
         monthlyDuesStatus <-
-          row(Keys.MONTHLY_DUES_STATUS).as[UnknownEntryOr[MonthlyDuesStatus]]
+          row(Keys.MONTHLY_DUES_STATUS).as[MonthlyDuesStatus]
         membershipStatus <-
-          row(Keys.MEMBERSHIP_STATUS).as[UnknownEntryOr[MembershipStatus]]
+          row(Keys.MEMBERSHIP_STATUS).as[MembershipStatus]
       } yield national.CsvRecord(
         akId,
         NameComponentsUsa(

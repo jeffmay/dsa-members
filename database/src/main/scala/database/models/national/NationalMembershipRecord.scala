@@ -5,6 +5,8 @@ import database.models.{Address, Name, PhoneNumber}
 
 import io.estatico.newtype.macros.newtype
 
+import java.time.LocalDate
+
 case class NationalMembershipRecord(
   id: NationalMembershipRecord.Id,
   akId: AkID,
@@ -12,14 +14,13 @@ case class NationalMembershipRecord(
   billingAddress: Address,
   mailingAddress: Address,
   phoneNumbers: Set[PhoneNumber],
-  //  emailAddress: Option[EmailAddress],
-  //  mailPreference: UnknownEntryOr[MailPreference],
-  //  doNotCall: Boolean,
-  //  joinDate: LocalDate,
-  //  expiryDate: LocalDate,
-  //  membershipType: UnknownEntryOr[MembershipType],
-  //  monthlyDuesStatus: UnknownEntryOr[MonthlyDuesStatus],
-  //  membershipStatus: UnknownEntryOr[MembershipStatus],
+  mailPreference: MailPreference,
+  doNotCall: Boolean,
+  joinDate: LocalDate,
+  expiryDate: LocalDate,
+  membershipType: MembershipType,
+  monthlyDuesStatus: MonthlyDuesStatus,
+  membershipStatus: MembershipStatus,
 )
 
 object NationalMembershipRecord {

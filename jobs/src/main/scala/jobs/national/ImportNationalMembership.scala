@@ -49,9 +49,10 @@ object ImportNationalMembership {
     format: CSVFormat,
   ): URIO[Blocking, ImportResults] = {
     val reader = CsvParser.fromFile(path, format)
-    val decodeRecords =
-      CsvDecoder.decodeRowsAsEitherFailureOr[CsvRecord].usingHeaderInfo(reader)
-    decodeRecords.catchAll(f => ZStream.succeed(Left(f))).run {
+    val decodeRecords = CsvDecoder
+      .decodeRowsAsEitherFailureOr[CsvRecord].usingHeaderInfo(reader)
+      .catchAll(f => ZStream.succeed(Left(f)))
+    decodeRecords.run {
       ZSink.foldLeft(ImportResults()) {
         case (res, Left(failure)) =>
           res.recordFailure(failure)
