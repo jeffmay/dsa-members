@@ -10,7 +10,7 @@ object Dependencies {
   final private val catsVersion = "2.6.0"
   final private val catsEffectVersion = "3.1.0"
   final private val disciplineVersion = "1.1.4"
-  final private val doobieVersion = "1.0.0-M1"
+  final private val doobieVersion = "1.0.0-M2"
   final private val enumeratumVersion = "1.6.1"
   final private val fs2Version = "3.0.2"
   final private val munitVersion = "0.7.25"
@@ -20,11 +20,11 @@ object Dependencies {
   final private val scalaCheckVersion = "1.15.3"
   final private val scalaCsvVersion = "1.3.7"
   final private val scalacticVersion = "3.2.7"
-  final private val zioVersion = "1.0.5"
-  final private val zioCatsVersion = "2.4.0.0"
+  final private val zioVersion = "1.0.7"
+  final private val zioCatsVersion = "3.0.2.0"
   final private val zioConfigVersion = "1.0.4"
   final private val zioHttpVersion = "1.0.0.0-RC15"
-  final private val zioJsonVersion = "0.1.3"
+  final private val zioJsonVersion = "0.1.4"
   final private val zioLoggingVersion = "0.5.8"
   final private val zioNioVersion = "1.0.0-RC10"
 
@@ -124,6 +124,7 @@ object Dependencies {
       doobieCore,
       doobiePostgres,
       fs2Core,
+      zioCats,
     ),
   )
 
