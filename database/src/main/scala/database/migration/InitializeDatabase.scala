@@ -19,13 +19,13 @@ object InitializeDatabase extends DataMigration {
   )
 
   // Creates all the tables and returns the number of updates performed
-  override def up(xa: Transactor[Task]): Task[MigrationResults] = {
+  override def upgrade(xa: Transactor[Task]): Task[MigrationResults] = {
     tables.traverse(_.createTable.update.run.transact(xa)).map {
       updates => MigrationResults(updates = updates.sum)
     }
   }
 
-  override def down(xa: Transactor[Task]): Task[MigrationResults] =
+  override def downgrade(xa: Transactor[Task]): Task[MigrationResults] =
     tables.reverse.traverse(_.dropTable.update.run.transact(xa)).map {
       updates => MigrationResults(updates = updates.sum)
     }

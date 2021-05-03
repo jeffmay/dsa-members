@@ -16,9 +16,9 @@ abstract class DataMigration extends CatsApp {
     )
   }
 
-  def up(xa: Transactor[Task]): Task[MigrationResults]
+  def upgrade(xa: Transactor[Task]): Task[MigrationResults]
 
-  def down(xa: Transactor[Task]): Task[MigrationResults]
+  def downgrade(xa: Transactor[Task]): Task[MigrationResults]
 
   override def run(args: List[String]): URIO[ZEnv, ExitCode] = {
     // A transactor that gets connections from java.sql.DriverManager and executes blocking operations
@@ -29,7 +29,7 @@ abstract class DataMigration extends CatsApp {
       "postgres", // user
       "u1h10HNjt1UH", // password
     )
-    up(xa).exitCode
+    upgrade(xa).exitCode
   }
 }
 
