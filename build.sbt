@@ -13,6 +13,9 @@ ThisBuild / scalafmtOnCompile := true
 // Avoid the error about unused key, since this is used by the IDE and not SBT
 Global / excludeLintKeys += idePackagePrefix
 
+// Reload the sbt config and .env environment variables when the build configs change
+Global / onChangedBuildSource := ReloadOnSourceChanges
+
 val commonScalacOptions = scalacOptions ++= Seq(
   "-deprecation",
   "-Ymacro-annotations",
