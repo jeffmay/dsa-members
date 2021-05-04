@@ -1,35 +1,72 @@
 package org.dsasf.members
 package database.migration
 
+import database.config.{DatabaseConfig, PostgresConfig}
+
 import doobie._
 import zio._
 import zio.interop.catz._
 import zio.logging._
 
 abstract class DataMigration extends CatsApp {
+  final type MEnv = DataMigration.MEnv
+  final type MTask[+A] = ZIO[MEnv, Throwable, A]
 
-  protected lazy val logger: ZLayer[ZEnv, Nothing, Logging] = Logging.console()
+  protected def hasLogging: ZLayer[ZEnv, Nothing, Logging] =
+    DataMigration.defaultLogging
 
-  implicit protected val logHandler: LogHandler = LogHandler { event =>
-    runtime.unsafeRun(
-      log.info(s"Executing SQL: ${event.sql}").provideLayer(logger),
-    )
-  }
+  protected def hasLogHandler: ZLayer[Logging, Nothing, Has[LogHandler]] =
+    DataMigration.defaultLogHandler(runtime)
 
-  def upgrade(xa: Transactor[Task]): Task[MigrationResults]
+  def upgrade(xa: Transactor[Task])(implicit
+    lh: LogHandler,
+  ): MTask[MigrationResults]
 
-  def downgrade(xa: Transactor[Task]): Task[MigrationResults]
+  def downgrade(xa: Transactor[Task])(implicit
+    lh: LogHandler,
+  ): MTask[MigrationResults]
 
   override def run(args: List[String]): URIO[ZEnv, ExitCode] = {
-    // A transactor that gets connections from java.sql.DriverManager and executes blocking operations
-    // on an our synchronous EC. See the chapter on connection handling for more info.
-    val xa = Transactor.fromDriverManager[Task](
-      "org.postgresql.Driver", // driver classname
-      "jdbc:postgresql:dsasf", // connect URL (driver-specific)
-      "postgres", // user
-      "u1h10HNjt1UH", // password
-    )
-    upgrade(xa).exitCode
+    // Create migration
+    val migration = for {
+      conf <- ZIO.service[PostgresConfig]
+      _ <- log.info(s"Connecting to ${conf.jdbcUrl}")
+      xa = Transactor.fromDriverManager[Task](
+        "org.postgresql.Driver",
+        conf.jdbcUrl,
+        conf.username,
+        conf.password,
+      )
+      lh <- ZIO.service[LogHandler]
+      results <- upgrade(xa)(lh)
+    } yield results
+    // Run the migration
+    migration.provideCustomLayer {
+      // Inject dependencies by building the appropriate ZLayers
+      DatabaseConfig.fromEnv ++ hasLogging >+> hasLogHandler
+    }.exitCode // Convert success or error into the appropriate exit code
+  }
+}
+
+object DataMigration {
+  type MEnv = ZEnv with Logging with Has[PostgresConfig]
+
+  val defaultLogging: ZLayer[ZEnv, Nothing, Logging] = Logging.console()
+
+  def defaultLogHandler(runtime: Runtime[ZEnv]): ZLayer[
+    Logging,
+    Nothing,
+    Has[LogHandler],
+  ] = {
+    ZLayer.fromEffect {
+      ZIO.access[Logging] { logging =>
+        LogHandler { event =>
+          runtime.unsafeRun {
+            log.info(s"Executing SQL: ${event.sql}").provide(logging)
+          }
+        }
+      }
+    }
   }
 }
 

@@ -3,7 +3,7 @@ services:
 
   # The REST / GraphQL API
 #  api:
-#    image: dsasanfrancisco/membership_api
+#    image: dsasanfrancisco/members-api
     # All environment variables should go in these files
     # The order is significant and .env must override all others
 #    env_file:

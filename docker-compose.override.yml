@@ -1,3 +1,6 @@
+# WARNING:
+# THIS FILE IS NOT CURRENTLY USED BY `docker compose` (THE DOCKER CLI VERSION)
+# IT IS ONLY USED BY `docker-compose` (THE STANDALONE TOOL)
 version: '3.1'
 services:
 
