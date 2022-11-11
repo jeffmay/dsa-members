@@ -2,6 +2,10 @@
 .env
 tmp/
 
+# IntelliJ IDEA
+.idea
+*.iml
+
 # sbt
 .bsp/
 target/
