@@ -1,17 +1,17 @@
 package zio
 package csv
 
-trait RowDecoder[-R, A] {
-  def decode(row: Row[R]): RowDecoder.Result[R, A]
+trait RowDecoder[-R, +A] {
+  def decode(row: Row[R]): RowDecoder.Result[A]
 }
 
 object RowDecoder {
-  type FromPositionOnly[A] = RowDecoder[Any, A]
+  type FromPositionOnly[+A] = RowDecoder[Any, A]
   final object FromPositionOnly {
     @inline def apply[A : FromPositionOnly]: FromPositionOnly[A] = implicitly
   }
 
-  type FromHeaderInfo[A] = RowDecoder[Has[HeaderCtx], A]
+  type FromHeaderInfo[+A] = RowDecoder[HeaderCtx, A]
   final object FromHeaderInfo {
     @inline def apply[A : FromHeaderInfo]: FromHeaderInfo[A] = implicitly
   }
@@ -23,7 +23,7 @@ object RowDecoder {
     * make your row or result type not match the expected return type.
     */
   def build[R, A](
-    decoder: Row[R] => RowDecoder.Result[R, A],
+    decoder: Row[R] => RowDecoder.Result[A],
   ): RowDecoder[R, A] = decoder.apply
 
   implicit def decodeEither[R, A](implicit
@@ -38,14 +38,15 @@ object RowDecoder {
     decoder.decode(row).either.map(_.toOption)
   }
 
-  implicit class FromHeaderOps[A](private val decoder: FromHeaderInfo[A])
+  implicit class FromHeaderOps[+A](private val decoder: FromHeaderInfo[A])
     extends AnyVal {
     def withFixedHeader(header: HeaderCtx): FromPositionOnly[A] = { row =>
-      decoder.decode(row.setHeaderContext(header)).provide(Has(header))
+      val env = row.toEnv.add(header)
+      decoder.decode(Row[HeaderCtx](env))
     }
   }
 
-  type Result[-R, A] = ZIO[R, DecodingFailure, A]
+  type Result[+A] = IO[DecodingFailure, A]
 
   @inline def apply[R, A](implicit
     decoder: RowDecoder[R, A],

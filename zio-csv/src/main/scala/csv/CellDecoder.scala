@@ -2,15 +2,15 @@ package zio
 package csv
 
 import enumeratum.ops.EnumCodec
-import zio.stream.{ZSink, ZStream}
 
 import java.time.{Instant, LocalDate, LocalDateTime, ZonedDateTime}
-import scala.collection.{mutable, Factory}
+import scala.collection.Factory
 import scala.collection.immutable.ArraySeq
 import scala.util.Try
 import scala.util.matching.Regex
 
-trait CellDecoder[A] {
+// TODO: Create CellDecoder that requires a header?
+trait CellDecoder[+A] {
 
   /** Decode the given cell contents into the expected type or return a [[CellDecodingFailure]].
     */
@@ -22,12 +22,8 @@ trait CellDecoder[A] {
 
   /** Decode the given [[Cell]] into the expected type or return a [[CellDecodingFailure]].
     */
-  final def decodeCell(cell: Cell): IO[DecodingFailure, A] = {
-    for {
-      env <- cell.asEnv
-      res <- decodeString(env.get[CellCtx].content).provide(env)
-    } yield res
-  }
+  final def decodeCell(cell: Cell[Any]): IO[DecodingFailure, A] =
+    decodeString(cell.toEnv.get[CellCtx].content).provideEnvironment(cell.toEnv)
 
   /** Apply a function to the decoded result to get a new decoder, use it to decode the cell, and don't
     * catch any exceptions thrown while building the decoder.
@@ -99,14 +95,16 @@ trait CellDecoder[A] {
 
   /** Run two decoders and return their results as a pair.
     */
-  final def product[B](fb: CellDecoder[B]): CellDecoder[(A, B)] = { c =>
-    flatMap(a => fb.map(b => (a, b))).decodeString(c)
+  final def product[B](decodeB: CellDecoder[B]): CellDecoder[(A, B)] = { c =>
+    flatMap(a => decodeB.map(b => (a, b))).decodeString(c)
   }
 }
 
 object CellDecoder {
-  type MinCtx = Has[RowCtx] with Has[CellCtx] with Has[MaybeHeaderCtx]
-  type Result[A] = ZIO[MinCtx, CellDecodingFailure, A]
+  type Ctx[+H] = H with RowCtx with CellCtx
+  type MinCtx = Ctx[Any]
+  type ResultFromHeader[-H, +A] = ZIO[Ctx[H], CellDecodingFailure, A]
+  type Result[+A] = ResultFromHeader[Any, A]
 
   @inline def apply[A](implicit
     decoder: CellDecoder[A],
@@ -135,7 +133,7 @@ object CellDecoder {
     )
   }
 
-  sealed trait Split[A] extends Any {
+  sealed trait Split[+A] extends Any {
 
     protected def split: String => CellDecoder.Result[Iterable[A]]
 
@@ -200,7 +198,7 @@ object CellDecoder {
       new SplitValidated(split)
   }
 
-  final class SplitValidated[A](
+  final class SplitValidated[+A](
     override protected val split: String => CellDecoder.Result[Iterable[A]],
   ) extends AnyVal
     with Split[A]
@@ -293,7 +291,7 @@ object CellDecoder {
     }
 
   def fromStringSafe[A : Tag](convert: String => A): CellDecoder[A] = { str =>
-    ZIO(convert(str))
+    ZIO.attempt(convert(str))
       .flatMapError { ex =>
         CellDecodingFailure.buildFromContextValues {
           CellDecodingException[A](_, _, _, ex)

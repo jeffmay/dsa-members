@@ -2,43 +2,39 @@ package org.dsasf.members
 package api
 
 import zio._
-import zio.clock.Clock
 import zio.config._
 
-object Main extends App {
+object Main extends ZIOAppDefault {
 
-  override def run(args: List[String]): URIO[ZEnv, ExitCode] = {
+  override def run: ZIO[ZIOAppArgs with Scope, Any, Any] = {
     // create the configuration layer
     // TODO: Move to separate config object?
-    val configLayer = ZLayer.fromEffect {
-      val cmdLineArgs = ConfigSource.fromCommandLineArgs(args)
-      lazy val serverConfigFromCmdLine = ServerConfig
-        .loader
-        .mapKey(toKebabCase(_).toLowerCase)
-        .from(cmdLineArgs)
+    val configLayer = ZLayer.fromZIO {
       for {
-        envVars <- ConfigSource.fromSystemEnv
+        args <- ZIO.service[ZIOAppArgs]
         // Pull server configs from the command-line args first, then from env vars, then the defaults
-        serverConfig <- IO.fromEither {
-          read {
-            lazy val serverConfigFromEnv = ServerConfig
-              .loader
-              .mapKey(toSnakeCase(_).toUpperCase)
-              .from(envVars)
-            serverConfigFromCmdLine orElse serverConfigFromEnv orElse
-              ServerConfig.loader.default(ServerConfig(9000))
-          }
+        serverConfig <- read {
+          lazy val serverConfigFromCmdLine = ServerConfig
+            .loader
+            .mapKey(toKebabCase(_).toLowerCase)
+            .from(ConfigSource.fromCommandLineArgs(args.getArgs.toList))
+          lazy val serverConfigFromEnv = ServerConfig
+            .loader
+            .mapKey(toSnakeCase(_).toUpperCase)
+            .from(ConfigSource.fromSystemEnv())
+          serverConfigFromCmdLine orElse serverConfigFromEnv orElse
+            ServerConfig.loader.default(ServerConfig(9000))
         }
+
       } yield serverConfig
     }
-    val deployInfoLayer = ZLayer.fromEffect {
+    val deployInfoLayer = ZLayer.fromZIO {
       for {
-        clock <- ZIO.service[Clock.Service]
-        now <- clock.currentDateTime
+        now <- Clock.currentDateTime
       } yield DeployInfo(now)
     }
     // start the web server
-    AppServer.run.provideCustomLayer(configLayer ++ deployInfoLayer).exitCode
+    AppServer.run.provideSome(configLayer, deployInfoLayer)
   }
 
 }

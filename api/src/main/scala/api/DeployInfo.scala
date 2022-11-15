@@ -1,21 +1,19 @@
 package org.dsasf.members
 package api
 
-import zio.json._
+import zio.{BuildInfo => _, _}
+import zio.json.{BuildInfo => _, _}
 import zio.json.ast.Json
 
 import java.time._
-import scala.concurrent.duration._
 
 final case class DeployInfo(deployedAt: OffsetDateTime) {
 
   def aliveSince(now: Instant): String = {
     val duration = (now.getEpochSecond - deployedAt.toEpochSecond).seconds
-    val coarsest = duration.toCoarsest
+    val coarsest = duration.asScala.toCoarsest
     s"$coarsest ago"
   }
-
-  def aliveSinceDefaultTimeZone(): String = aliveSince(Instant.now())
 }
 
 object DeployInfo {

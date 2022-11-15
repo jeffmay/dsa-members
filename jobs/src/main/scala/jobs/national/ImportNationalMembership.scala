@@ -2,15 +2,9 @@ package org.dsasf.members
 package jobs.national
 
 import com.github.tototoshi.csv.CSVFormat
-import zio.URIO
+import zio.{UIO, URIO}
 import zio.blocking.Blocking
-import zio.csv.{
-  CsvDecoder,
-  CsvParser,
-  DecodingFailure,
-  ParsingFailure,
-  ReadingFailure,
-}
+import zio.csv.{CsvDecoder, CsvParser, DecodingFailure, ParsingFailure, ReadingFailure}
 import zio.stream.{ZSink, ZStream}
 
 import java.nio.file.Path
@@ -47,7 +41,7 @@ object ImportNationalMembership {
   def fromCsvFile(
     path: Path,
     format: CSVFormat,
-  ): URIO[Blocking, ImportResults] = {
+  ): UIO[ImportResults] = {
     val reader = CsvParser.fromFile(path, format)
     val decodeRecords = CsvDecoder
       .decodeRowsAsEitherFailureOr[CsvRecord].usingHeaderInfo(reader)

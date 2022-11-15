@@ -1,51 +1,46 @@
 package zio
 package csv
+import csv.Cell.Ctx
 
 object Cell {
-  type Env = Has[RowCtx] with Has[CellCtx] with Has[MaybeHeaderCtx]
+  type Ctx[+H] = H with CellCtx with RowCtx
 
-  /** Creates a single [[Cell]] inside an [[Env]] with no other rows or columns.
+  /** Creates an [[Cell]] containing 1 row and 1 column with no header where the 1 cell contains the given content.
     */
-  def detached(content: String): Cell =
-    fromEffect(ZIO.succeed(detachedEnv(content)))
-
-  /** Creates an [[Env]] containing 1 row and 1 column where the 1 cell contains the given content.
-    */
-  def detachedEnv(content: String): Env =
-    Has.allOf[RowCtx, CellCtx, MaybeHeaderCtx](
-      RowCtx(1, Vector(content)),
-      CellCtx(0, content),
-      HeaderCtx.none,
+  def detached(content: String, rowIndex: Long = 0, colIndex: Int = 0): Cell[Any] = {
+    val env = ZEnvironment[RowCtx, CellCtx](
+      RowCtx(rowIndex, Chunk(content)),
+      CellCtx(colIndex, content),
     )
+    Cell(env)
+  }
 
-  def fromEffect(
-    result: IO[DecodingFailure, Env],
-  ): Cell =
-    new Cell(result)
 }
 
-final class Cell(
-  val asEnv: IO[DecodingFailure, Cell.Env],
-) extends AnyVal {
+final case class Cell[+H](
+  toEnv: ZEnvironment[Cell.Ctx[H]],
+) extends AnyVal
+  with HeaderInfo[Cell.Ctx[Any], Cell.Ctx[H]]
+  with RowInfo[Cell.Ctx[Any], Cell.Ctx[H]] {
+//  override type Header = H
+//  override type EnvMin = Cell.Ctx[Any]
+//  override type Env = Cell.Ctx[H]
+  override type Self[+env <: Cell.Ctx[Any]] = Cell[env]
 
-  def colIndex: IO[DecodingFailure, Int] =
-    asEnv.map(_.get[CellCtx].columnIndex)
+  override protected def build[R <: Ctx[Any]](env: ZEnvironment[R]): Cell[R] =
+    Cell[R](toEnv.prune[Cell.Ctx[Any]].unionAll[R](env))
 
-  def rowIndex: IO[DecodingFailure, Long] =
-    asEnv.map(_.get[RowCtx].rowIndex)
+  def colIndex: Int = toEnv.get[CellCtx].columnIndex
 
-  def asString: IO[DecodingFailure, String] =
-    asEnv.map(_.get[CellCtx].content)
+  def content: String =
+    toEnv.get[CellCtx].content
 
   def as[A](implicit
     decoder: CellDecoder[A],
   ): IO[DecodingFailure, A] = {
-    for {
-      env <- asEnv
-      a <- CellDecoder[A]
-        // provide the resolved cell context as the environment for the decoder
-        // the remaining context must come from outside the cell (i.e. the header context)
-        .decodeString(env.get[CellCtx].content).provide(env)
-    } yield a
+    CellDecoder[A]
+      // provide the resolved cell context as the environment for the decoder
+      // the remaining context must come from outside the cell (i.e. the header context)
+      .decodeString(toEnv.get[CellCtx].content).provideEnvironment(toEnv)
   }
 }

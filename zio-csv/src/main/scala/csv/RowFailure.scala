@@ -117,25 +117,17 @@ object CellDecodingFailure {
   @inline def buildFromContextValues[F](
     build: (Long, Int, Option[String]) => F,
   ): URIO[CellDecoder.MinCtx, F] = {
-    buildFromContext { (row, cell, header) =>
-      build(
-        row.rowIndex,
-        cell.columnIndex,
-        header.flatMap(_.columnNameByIndex.get(cell.columnIndex)),
-      )
-    }
-  }
-
-  @inline def buildFromContext[F](
-    build: (RowCtx, CellCtx, Option[HeaderCtx]) => F,
-  ): URIO[CellDecoder.MinCtx, F] = {
-    ZIO.access[CellDecoder.MinCtx] { ctx =>
-      build(
-        ctx.get[RowCtx],
-        ctx.get[CellCtx],
-        ctx.get[MaybeHeaderCtx].maybeHeaderCtx,
-      )
-    }
+    for {
+      env <- ZIO.environment[Any]
+      row <- ZIO.service[RowCtx]
+      cell <- ZIO.service[CellCtx]
+    } yield build(
+      row.rowIndex,
+      cell.columnIndex,
+      CsvEnv.getOption[HeaderCtx](env).flatMap(
+        _.columnNameByIndex.get(cell.columnIndex),
+      ),
+    )
   }
 
   /** Create [[CellDecodingFailure]] without a known type using the [[CellDecoder.MinCtx]] and the given message.

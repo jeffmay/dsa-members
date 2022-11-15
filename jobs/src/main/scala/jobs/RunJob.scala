@@ -8,11 +8,11 @@ import zio.stream.{ZStream, ZTransducer}
 
 import java.nio.file.{Path, Paths}
 
-object RunJob extends App {
+object RunJob extends ZIOAppDefault {
 
   private val sampleFile: Path = Paths.get("tmp", "dsasf-2021-03-21.csv")
 
-  override def run(args: List[String]): URIO[ZEnv, ExitCode] = {
+  override val run: ZIO[Environment with ZIOAppArgs with Scope, Any, Any] = {
 //    val linesOfFile = ZStream.fromFile(sampleFile).transduce(
 //      ZTransducer.utfDecode >>> ZTransducer.splitLines,
 //    )

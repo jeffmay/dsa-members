@@ -1,85 +1,106 @@
 package zio
 package csv
 
-object Row {
-  type MinCtx = Has[RowCtx] with Has[MaybeHeaderCtx]
+import scala.util.control.NonFatal
 
-  def noHeaderCtx(rowIdx: Long, values: Iterable[String]): Row[Has[NoHeaderCtx]] =
-    new Row(Has.allOf[RowCtx, MaybeHeaderCtx, NoHeaderCtx](
-      RowCtx(rowIdx, values.toIndexedSeq),
-      HeaderCtx.none.widen,
-      HeaderCtx.none,
-    ))
+// TODO: Move to separate files or move Cell to here?
 
-  def withHeaderCtx(
-    rowIdx: Long,
-    values: Iterable[String],
-    header: HeaderCtx,
-  ): Row[Has[HeaderCtx]] =
-    new Row(Has.allOf[RowCtx, MaybeHeaderCtx, HeaderCtx](
-      RowCtx(rowIdx, values.toIndexedSeq),
-      header.widen,
-      header,
-    ))
-}
+private[csv] object CsvEnv {
 
-final class Row[+H] private (
-  private val ctx: Row.MinCtx with H,
-) extends AnyVal {
-
-  def getHeaderContext[C](implicit
-    ev: H <:< Has[C],
-    tagged: Tag[C],
-  ): C = ctx.get[C]
-
-  def setHeaderContext[C <: MaybeHeaderCtx : Tag](headerCtx: C): Row[Has[C]] =
-    new Row[Has[C]](Has.allOf[RowCtx, MaybeHeaderCtx, C](
-      ctx.get[RowCtx],
-      headerCtx.widen,
-      headerCtx,
-    ))
-
-  def rowContext: RowCtx = ctx.get[RowCtx]
-
-  def rowIndex: Long = ctx.get[RowCtx].rowIndex
-
-  def cells: IndexedSeq[String] = ctx.get[RowCtx].cells
-
-  def apply(idx: Int): Cell =
-    Cell.fromEffect {
-      val row = ctx.get[RowCtx]
-      ZIO.fromEither {
-        // build an option of our cell
-        Option.when(row.cells.isDefinedAt(idx)) {
-          // merge the cell context with the row context
-          Has.allOf(
-            row,
-            CellCtx(idx, row.cells(idx)),
-            ctx.get[MaybeHeaderCtx],
-          )
-        }.toRight {
-          InvalidColumnIndex(row.rowIndex, idx)
-        }
+  def getOption[T : Tag](env: ZEnvironment[Any]): Option[T] =
+    Unsafe.unsafe { implicit unsafe =>
+      try Some(env.unsafe.get(Tag[HeaderCtx].tag))
+      catch {
+        case NonFatal(_) => None
       }
     }
+}
 
-  def apply(
-    key: String,
-  )(implicit
-    evH: H <:< Has[HeaderCtx],
-    tagged: Tag[HeaderCtx],
-  ): Cell =
-    Cell.fromEffect {
-      for {
-        // grab the header context so we can look up the column index by name
-        // get the column index or fail
-        colIdx <- ZIO.fromEither {
-          ctx.get[HeaderCtx].columnIndexByName.get(key).toRight {
-            InvalidColumnName(rowIndex, key)
-          }
-        }
-        // reuse the logic above to create our underlying
-        cellCtx <- this.apply(colIdx).asEnv
-      } yield cellCtx
+private[csv] trait CsvEnv[EnvMin, +Env <: EnvMin] extends Any { self =>
+//  protected type EnvMin
+//  protected type Env <: EnvMin
+//  protected type Self[+env <: EnvMin] <: CsvEnv {
+//    type EnvMin = self.EnvMin
+//    type Env = env
+//  }
+
+  protected type Self[+env <: EnvMin] <: CsvEnv[EnvMin, env]
+
+  def toEnv: ZEnvironment[Env]
+
+  protected def build[R <: EnvMin](env: ZEnvironment[R]): Self[R]
+
+  protected def getOption[T : Tag]: Option[T] = CsvEnv.getOption[T](toEnv)
+}
+
+trait RowInfo[EnvMin <: RowCtx, +Env <: EnvMin] extends Any with CsvEnv[EnvMin, Env] { self =>
+  override protected type Self[+env <: EnvMin] <: RowInfo[EnvMin, env]
+
+  def rowIndex: Long = toEnv.get[RowCtx].rowIndex
+}
+
+trait HeaderInfo[EnvMin, +Env <: EnvMin] extends Any with CsvEnv[EnvMin, Env] {
+//  override protected type Self[+env <: EnvMin] <: HeaderInfo {
+//    type EnvMin = self.EnvMin
+//    type Env <: env
+//
+  //  }
+
+  override protected type Self[+env <: EnvMin] <: HeaderInfo[EnvMin, env]
+
+  def headerContext[H >: Env](implicit
+    ev: H <:< HeaderCtx,
+    tag: Tag[H],
+  ): HeaderCtx =
+    ev(toEnv.get[H])
+
+  def optionalHeaderContext: Option[HeaderCtx] = getOption[HeaderCtx]
+
+  def addHeaderContext(headerCtx: HeaderCtx): Self[HeaderCtx with Env] =
+    build(toEnv.add[HeaderCtx](headerCtx))
+}
+
+final case class Row[+H](toEnv: ZEnvironment[H with RowCtx])
+  extends AnyVal with HeaderInfo[RowCtx, H with RowCtx] with RowInfo[RowCtx, H with RowCtx] {
+//  override protected type EnvMin = RowCtx
+//  override protected type Env = H with RowCtx
+  override protected type Self[+env <: RowCtx] = Row[env]
+
+  override protected def build[NR <: RowCtx](env: ZEnvironment[NR]): Row[NR] =
+    Row[NR](toEnv.prune[RowCtx].unionAll[NR](env))
+
+  def context: RowCtx = toEnv.get[RowCtx]
+
+  def cells: UIO[Chunk[Cell[H]]] = ZIO.succeed {
+    val row = toEnv.get[RowCtx]
+    row.cellContents.zipWithIndex.map { case (content, idx) =>
+      Cell[H](toEnv.add[CellCtx](CellCtx(idx, content)))
     }
+  }
+
+  def apply(idx: Int): IO[InvalidColumnIndex, Cell[H]] = cells.flatMap {
+    cells =>
+      // build an option of our cell
+      if (cells.isDefinedAt(idx)) {
+        // merge the cell context with the row context
+        ZIO.succeed(cells.apply(idx))
+      } else {
+        ZIO.fail(InvalidColumnIndex(rowIndex, idx))
+      }
+  }
+
+  def apply[C >: H : Tag](key: String)(implicit
+    ev: C <:< HeaderCtx,
+  ): IO[DecodingFailure, Cell[H]] =
+    for {
+      // grab the header context so we can look up the column index by name
+      // get the column index or fail
+      colIdx <- ZIO.fromEither {
+        ev(toEnv.get[C]).columnIndexByName.get(key).toRight {
+          InvalidColumnName(rowIndex, key)
+        }
+      }
+      // reuse the logic above to create our underlying
+      cellCtx <- this.apply(colIdx)
+    } yield cellCtx
 }

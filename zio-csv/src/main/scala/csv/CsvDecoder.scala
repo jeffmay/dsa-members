@@ -11,11 +11,11 @@ object CsvDecoder {
     */
   def readHeaderInfo[R, E >: RowFailure](
     rows: ZStream[R, E, Row[Any]],
-  ): ZManaged[R, E, Option[(HeaderCtx, ZStream[R, E, Row[Has[HeaderCtx]]])]] = {
+  ): ZIO[R with Scope, E, Option[ZStream[R, E, Row[HeaderCtx]]]] = {
     rows.peel(ZSink.head[Row[Any]]).map { case (maybeHead, tail) =>
       maybeHead.map { firstRow =>
-        val ctx = HeaderCtx(firstRow.cells)
-        (ctx, tail.map(_.setHeaderContext(ctx)))
+        val ctx = HeaderCtx(firstRow.context.cellContents)
+        tail.map(_.addHeaderContext(ctx))
       }
     }
   }
@@ -30,7 +30,7 @@ final class DecodeRowsAsOrFail[A](private val dummy: Boolean = true)
   extends AnyVal with DecodeRowsAs[RowFailure, A, A] {
 
   override protected def wrapResult[R](
-    result: Result[R, A],
+    result: Result[A],
   ): ZIO[R, RowFailure, A] = result
 }
 
@@ -38,38 +38,38 @@ final class DecodeRowsAsEitherFailuresOr[A](private val dummy: Boolean = true)
   extends AnyVal with DecodeRowsAs[Nothing, A, Either[RowFailure, A]] {
 
   override protected def wrapResult[R](
-    result: Result[R, A],
+    result: Result[A],
   ): ZIO[R, Nothing, Either[RowFailure, A]] = result.either
 }
 
 sealed trait DecodeRowsAs[+E <: RowFailure, A, +T] extends Any {
 
   protected def wrapResult[R](
-    result: RowDecoder.Result[R, A],
+    result: RowDecoder.Result[A],
   ): ZIO[R, E, T]
 
   def usingPositionOnly[R, E1 >: E](
     rows: ZStream[R, E1, Row[Any]],
   )(implicit decoder: RowDecoder.FromPositionOnly[A]): ZStream[R, E1, T] = {
-    rows.mapM { row =>
+    rows.mapZIO { row =>
       wrapResult(decoder.decode(row))
     }
   }
 
+  // TODO: Should this require a scope? or provide one locally?
   def usingHeaderInfo[R, E1 >: RowFailure](
     rows: ZStream[R, E1, Row[Any]],
-  )(implicit decoder: RowDecoder.FromHeaderInfo[A]): ZStream[R, E1, T] = {
+  )(implicit decoder: RowDecoder.FromHeaderInfo[A]): ZStream[R with Scope, E1, T] = {
     val readHeaderThenAllRows = CsvDecoder.readHeaderInfo(rows).map {
-      case Some((header, dataRows)) =>
-        dataRows.mapM { row =>
-          val env = Has.allOf(header, row.rowContext)
-          wrapResult(decoder.decode(row).provide(env))
+      case Some(rows) =>
+        rows.mapZIO { row =>
+          wrapResult(decoder.decode(row))
         }
       case None =>
         ZStream.empty
     }
     // flatten the ZManaged ZStream into a single ZStream
-    ZStream.managed(readHeaderThenAllRows).flatten
+    ZStream.scoped[R](readHeaderThenAllRows).flatten
   }
 
   def providedHeader[R, E1 >: E](

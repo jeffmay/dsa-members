@@ -3,12 +3,12 @@ name := "dsa-members-root"
 ThisBuild / organization := "org.dsasf"
 ThisBuild / organizationName := "San Francisco Democratic Socialists of America"
 
-ThisBuild / scalaVersion := "2.13.5"
+ThisBuild / scalaVersion := "2.13.10"
 //ThisBuild / scalaVersion := "3.0.0-RC1"
 //ThisBuild / useScala3doc := true
 
 // Run the formatter on compile to avoid checking in un-formatted code
-ThisBuild / scalafmtOnCompile := true
+//ThisBuild / scalafmtOnCompile := true
 
 // Avoid the error about unused key, since this is used by the IDE and not SBT
 Global / excludeLintKeys += idePackagePrefix
@@ -34,9 +34,9 @@ def commonLibrary(
     resolvers ++= dependencies.resolvers,
     commonScalacOptions,
     // Add support for Scala 3-like type lambda syntax
-    addCompilerPlugin(
-      "org.typelevel" % "kind-projector" % "0.11.3" cross CrossVersion.full,
-    ),
+//    addCompilerPlugin(
+//      "org.typelevel" % "kind-projector" % "0.11.3" cross CrossVersion.full,
+//    ),
   )
 }
 
