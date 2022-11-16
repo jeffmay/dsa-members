@@ -34,7 +34,10 @@ object Main extends ZIOAppDefault {
       } yield DeployInfo(now)
     }
     // start the web server
-    AppServer.run.provideSome(configLayer, deployInfoLayer)
+    AppServer.run.provideSome[ZIOAppArgs](
+      configLayer,
+      deployInfoLayer,
+    )
   }
 
 }

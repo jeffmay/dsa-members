@@ -1,10 +1,10 @@
 package org.dsasf.members
 package jobs
 
-import org.dsasf.members.jobs.national.ImportNationalMembership
+import jobs.national.ImportNationalMembership
+
 import zio._
 import zio.csv.CsvFormat
-import zio.stream.{ZStream, ZTransducer}
 
 import java.nio.file.{Path, Paths}
 
@@ -33,9 +33,11 @@ object RunJob extends ZIOAppDefault {
         ),
         CsvFormat.Default,
       )
-      _ <- console.putStr(
+      _ <- Console.printLine(
         s"Total successes: ${rs.successCount}, failures: ${rs.failureCount}\n${rs.allFailures.mkString("\n")}\n",
       )
     } yield ExitCode.success
   }
+
+
 }

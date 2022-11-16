@@ -35,7 +35,7 @@ final case class Cell[+H](
   def content: String =
     toEnv.get[CellCtx].content
 
-  def as[A](implicit
+  def contentAs[A](implicit
     decoder: CellDecoder[A],
   ): IO[DecodingFailure, A] = {
     CellDecoder[A]

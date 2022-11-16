@@ -56,6 +56,7 @@ sealed trait DecodeRowsAs[+E <: RowFailure, A, +T] extends Any {
     }
   }
 
+  // TODO: Convert this to a ZPipeline
   // TODO: Should this require a scope? or provide one locally?
   def usingHeaderInfo[R, E1 >: RowFailure](
     rows: ZStream[R, E1, Row[Any]],

@@ -1,21 +1,15 @@
 package zio
 package csv
 
-import stream.{ZSink, ZStream}
+import stream.{ZPipeline, ZStream}
 
-import com.github.tototoshi.csv.{CSVFormat, CSVParser}
+import com.github.tototoshi.csv.CSVFormat
 
-import java.io.Reader
-import scala.util.control.NonFatal
+import java.nio.file.Path
 
 object CsvParser {
 
-  // TODO: Replace these with a sink / channel
-  //       and a method to convert from a file to said stream that does not load everything into memory
-
   // TODO: Support fromReader / FileReader from JavaScript
-
-//  def fromReader(reader: Reader): ZIO[Scope, ReadingFailure, Row[Any]]
 
 //  def fromFile(
 //    path: Path,
@@ -23,20 +17,22 @@ object CsvParser {
 //  ): ZStream[Any, ReadingFailure, Row[Any]] =
 //    fromFileEither(path, format).absolve
 
-  // TODO: Use ZChannel
+  // TODO: Use ZChannel and ZPipeline
+
+  def fromFile(
+    path: Path,
+    format: CSVFormat,
+  ): ZStream[Any, ReadingFailure, Row[Any]] = {
+    ZStream.fromPath(path) >>> ZPipeline.utf8Decode
+    ???
+  }
 
 //  def fromFileEither(
 //    path: Path,
 //    format: CSVFormat,
 //  ): ZStream[Any, ParsingFailure, Either[RowParsingFailure, Row[Any]]] = {
 //    val parser = new CSVParser(format)
-//    ZStream.fromPath(path)
-//    for {
-//      c <- ZStream.fromPath(path)
-//      stillOpen <- c
-//    } yield ()
-////    val x = ZStream.fromPath(path)
-//    val x = Files.readAllBytes(path)
+//    Files.readAllBytes(path)
 //      .refineOrDie {
 //        case NonFatal(ex) => ParsingException(ex)
 //      }

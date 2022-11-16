@@ -9,19 +9,19 @@ import scala.collection.immutable.ArraySeq
 import scala.util.Try
 import scala.util.matching.Regex
 
+// TODO: Finish adding toString
+
 // TODO: Create CellDecoder that requires a header?
 trait CellDecoder[+A] {
 
-  /** Decode the given cell contents into the expected type or return a [[CellDecodingFailure]].
-    */
+  /** Decode the given cell contents into the expected type or return a [[CellDecodingFailure]]. */
   def decodeString(content: String): ZIO[
     CellDecoder.MinCtx,
     CellDecodingFailure,
     A,
   ]
 
-  /** Decode the given [[Cell]] into the expected type or return a [[CellDecodingFailure]].
-    */
+  /** Decode the given [[Cell]] into the expected type or return a [[CellDecodingFailure]]. */
   final def decodeCell(cell: Cell[Any]): IO[DecodingFailure, A] =
     decodeString(cell.toEnv.get[CellCtx].content).provideEnvironment(cell.toEnv)
 
@@ -59,20 +59,17 @@ trait CellDecoder[+A] {
       decodeString(content).orElse(decoder.decodeString(content))
     }
 
-  /** Prepare the content of the cell before applying this decoder.
-    */
+  /** Prepare the content of the cell before applying this decoder. */
   final def prepare(fn: String => String): CellDecoder[A] = { content =>
     decodeString(fn(content))
   }
 
-  /** Apply a function to the decoded result and don't catch any exceptions.
-    */
+  /** Apply a function to the decoded result and don't catch any exceptions. */
   final def map[B](fn: A => B): CellDecoder[B] = { content =>
     decodeString(content).map(fn)
   }
 
-  /** Apply a function to the decoded result that can return a failure synchronously.
-    */
+  /** Apply a function to the decoded result that can return a failure synchronously. */
   final def emap[B](fn: A => Either[String, B]): CellDecoder[B] = { content =>
     decodeString(content).flatMap { a =>
       ZIO.fromEither(fn(a)).flatMapError { reason =>
@@ -81,8 +78,7 @@ trait CellDecoder[+A] {
     }
   }
 
-  /** Apply a function to the decoded result and wrap any exceptions in a [[CellDecodingException]].
-    */
+  /** Apply a function to the decoded result and wrap any exceptions in a [[CellDecodingException]]. */
   final def mapSafe[B : Tag](fn: A => B): CellDecoder[B] = { content =>
     decodeString(content).flatMap { a =>
       ZIO.fromTry(Try(fn(a))).flatMapError { ex =>
@@ -93,8 +89,7 @@ trait CellDecoder[+A] {
     }
   }
 
-  /** Run two decoders and return their results as a pair.
-    */
+  /** Run two decoders and return their results as a pair. */
   final def product[B](decodeB: CellDecoder[B]): CellDecoder[(A, B)] = { c =>
     flatMap(a => decodeB.map(b => (a, b))).decodeString(c)
   }
@@ -167,7 +162,7 @@ object CellDecoder {
     )
   }
 
-  final class SplitAs[A](
+  final class SplitAs[+A](
     separator: String,
     split: String => CellDecoder.Result[Iterable[Either[
       CellDecodingFailure,
@@ -203,7 +198,14 @@ object CellDecoder {
   ) extends AnyVal
     with Split[A]
 
-  implicit val string: CellDecoder[String] = ZIO.succeed(_)
+  implicit val string: CellDecoder[String] = new CellDecoder[String] {
+    override def decodeString(content: String): ZIO[
+      MinCtx,
+      CellDecodingFailure,
+      String,
+    ] = ZIO.succeed(content)
+    override def toString: String = "CellDecoder.string"
+  }
 
   implicit val boolean: CellDecoder[Boolean] = {
     val validTrue = Set("true", "yes", "y", "on", "1")
@@ -242,24 +244,41 @@ object CellDecoder {
     fromStringSafe(ZonedDateTime.parse(_))
 
   implicit def optional[A : CellDecoder]: CellDecoder[Option[A]] =
-    fromEffect { str =>
-      val trimmed = str.trim
-      if (trimmed.isEmpty) {
-        ZIO.succeed(None)
-      } else {
-        CellDecoder[A].decodeString(trimmed).map(Option(_))
+    new CellDecoder[Option[A]] {
+      override def decodeString(content: String): ZIO[
+        MinCtx,
+        CellDecodingFailure,
+        Option[A],
+      ] = {
+        val trimmed = content.trim
+        if (trimmed.isEmpty) {
+          ZIO.succeed(None)
+        } else {
+          CellDecoder[A].decodeString(trimmed).map(Option(_))
+        }
       }
+      override def toString: String =
+        s"CellDecoder.optional(${CellDecoder[A].toString})"
     }
 
-  /** Does a match on the enum values based on the [[EnumCodec]]
-    */
-  implicit def fromEnum[E : EnumCodec : Tag]: CellDecoder[E] = { cell =>
-    ZIO.fromEither {
-      EnumCodec[E].findByNameInsensitive(cell).toEither
-    }.flatMapError {
-      CellDecodingFailure.fromExceptionDecodingAs[E](_)
+  // TODO: Replace with Scala 3 enum support
+
+  /** Does a match on the enum values based on the [[EnumCodec]] */
+  implicit def fromEnum[E : EnumCodec : Tag]: CellDecoder[E] =
+    new CellDecoder[E] {
+      override def decodeString(content: String): ZIO[
+        MinCtx,
+        CellDecodingFailure,
+        E,
+      ] =
+        ZIO.fromEither {
+          EnumCodec[E].findByNameInsensitive(content).toEither
+        }.flatMapError {
+          CellDecodingFailure.fromExceptionDecodingAs[E](_)
+        }
+      override def toString: String =
+        s"CellDecoder.fromEnum[${EnumCodec[E].enumName}]"
     }
-  }
 
   def const[A](value: A): CellDecoder[A] = new CellDecoder[A] {
     final override def decodeString(
@@ -277,27 +296,48 @@ object CellDecoder {
   def failWith[A](failWith: String => URIO[
     CellDecoder.MinCtx,
     CellDecodingFailure,
-  ]): CellDecoder[A] =
-    content => {
+  ]): CellDecoder[A] = new CellDecoder[A] {
+    override def decodeString(content: String): ZIO[
+      MinCtx,
+      CellDecodingFailure,
+      A,
+    ] =
       for {
         failure <- failWith(content)
         failed <- ZIO.fail(failure)
       } yield failed
-    }
 
-  def failWithMessage[A](reason: String): CellDecoder[A] =
-    failWith[A] { _ =>
-      CellDecodingFailure.fromMessage(reason)
-    }
-
-  def fromStringSafe[A : Tag](convert: String => A): CellDecoder[A] = { str =>
-    ZIO.attempt(convert(str))
-      .flatMapError { ex =>
-        CellDecodingFailure.buildFromContextValues {
-          CellDecodingException[A](_, _, _, ex)
-        }
-      }
+    override def toString: String = "CellDecoder.fail"
   }
+
+  def failWithMessage[A](reason: String): CellDecoder[A] = new CellDecoder[A] {
+    override def decodeString(content: String): ZIO[
+      MinCtx,
+      CellDecodingFailure,
+      A,
+    ] =
+      failWith[A] { _ =>
+        CellDecodingFailure.fromMessage(reason)
+      }.decodeString(content)
+    override def toString: String = s"CellDecoder.failWithMessage($reason)"
+  }
+
+  def fromStringSafe[A : Tag](convert: String => A): CellDecoder[A] =
+    new CellDecoder[A] {
+      override def decodeString(content: String): ZIO[
+        MinCtx,
+        CellDecodingFailure,
+        A,
+      ] =
+        ZIO.attempt(convert(content))
+          .flatMapError { ex =>
+            CellDecodingFailure.buildFromContextValues {
+              CellDecodingException[A](_, _, _, ex)
+            }
+          }
+      override def toString: String =
+        s"CellDecoder.fromStringSafe[${Tag[A].tag}]"
+    }
 
   def fromStringTotal[A](convert: String => A): CellDecoder[A] =
     str => ZIO.succeed(convert(str))

@@ -1,6 +1,8 @@
 package zio
 package csv
 
+// TODO: Accumulate errors in row result
+
 trait RowDecoder[-R, +A] {
   def decode(row: Row[R]): RowDecoder.Result[A]
 }

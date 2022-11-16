@@ -23,8 +23,8 @@ final case class UnknownEntryOr[E](
 object UnknownEntryOr {
 
   def apply[E : EnumCodec]: Builder[E] = {
-    val enum = EnumCodec[E]
-    new Builder[E](str => NoSuchMember(enum.enumName, enum.valueNames, str))
+    val enumeration = EnumCodec[E]
+    new Builder[E](str => NoSuchMember(enumeration.enumName, enumeration.valueNames, str))
   }
 
   final class Builder[E](private val buildException: String => NoSuchMember)

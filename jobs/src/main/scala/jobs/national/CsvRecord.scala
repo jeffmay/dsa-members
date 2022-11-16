@@ -5,7 +5,8 @@ import database.models.national._
 import database.models.{Address, EmailAddress, NameComponentsUsa, PhoneNumber}
 import jobs.{national, CommonDecoders}
 
-import zio.csv.{CellDecoder, RowDecoder}
+import zio.Tag
+import zio.csv.{CellDecoder, HeaderCtx, RowCtx, RowDecoder}
 
 import java.time.LocalDate
 
@@ -71,36 +72,43 @@ object CsvRecord extends CommonDecoders {
   implicit val decodeWithHeaders: RowDecoder.FromHeaderInfo[CsvRecord] = {
     row =>
       for {
-        akId <- row(Keys.AK_ID).as[AkID]
-        firstName <- row(Keys.FIRST_NAME).asString
-        middleName <- row(Keys.MIDDLE_NAME).asString
-        lastName <- row(Keys.LAST_NAME).asString
-        suffix <- row(Keys.SUFFIX).asString
-        billingAddressLine1 <- row(Keys.BILLING_ADDRESS_LINE_1).asString
-        billingAddressLine2 <- row(Keys.BILLING_ADDRESS_LINE_2).asString
-        billingCity <- row(Keys.BILLING_CITY).asString
-        billingState <- row(Keys.BILLING_STATE).asString
-        billingZip <- row(Keys.BILLING_ZIP).asString
-        mailingAddressLine1 <- row(Keys.MAILING_ADDRESS_LINE_1).asString
-        mailingAddressLine2 <- row(Keys.MAILING_ADDRESS_LINE_2).asString
-        mailingCity <- row(Keys.MAILING_CITY).asString
-        mailingState <- row(Keys.MAILING_STATE).asString
-        mailingZip <- row(Keys.MAILING_ZIP).asString
-        mobilePhone <- row(Keys.MOBILE_PHONE).as[Seq[PhoneNumber]]
-        homePhone <- row(Keys.HOME_PHONE).as[Seq[PhoneNumber]]
-        workPhone <- row(Keys.WORK_PHONE).as[Seq[PhoneNumber]]
-        emailAddress <- row(Keys.EMAIL).as[Option[EmailAddress]]
+        akId <- row.cellAs[AkID](Keys.AK_ID)
+        firstName <- row.cellAs[String](Keys.FIRST_NAME)
+        middleName <- row.cellAs[String](Keys.MIDDLE_NAME)
+        lastName <- row.cellAs[String](Keys.LAST_NAME)
+        suffix <- row.cellAs[String](Keys.SUFFIX)
+        billingAddressLine1 <- row.cellAs[String](Keys.BILLING_ADDRESS_LINE_1)
+        billingAddressLine2 <- row.cellAs[String](Keys.BILLING_ADDRESS_LINE_2)
+        billingCity <- row.cellAs[String](Keys.BILLING_CITY)
+        billingState <- row.cellAs[String](Keys.BILLING_STATE)
+        billingZip <- row.cellAs[String](Keys.BILLING_ZIP)
+        mailingAddressLine1 <- row.cellAs[String](Keys.MAILING_ADDRESS_LINE_1)
+        mailingAddressLine2 <- row.cellAs[String](Keys.MAILING_ADDRESS_LINE_2)
+        mailingCity <- row.cellAs[String](Keys.MAILING_CITY)
+        mailingState <- row.cellAs[String](Keys.MAILING_STATE)
+        mailingZip <- row.cellAs[String](Keys.MAILING_ZIP)
+        mobilePhone <- row.cellAs[Seq[PhoneNumber]](Keys.MOBILE_PHONE)
+        homePhone <- row.cellAs[Seq[PhoneNumber]](Keys.HOME_PHONE)
+        workPhone <- row.cellAs[Seq[PhoneNumber]](Keys.WORK_PHONE)
+        emailAddress <- row.cellAs[Option[EmailAddress]](Keys.EMAIL)
         mailPreference <-
-          row(Keys.MAIL_PREFERENCE).as[MailPreference]
-        doNotCall <- row(Keys.DO_NOT_CALL).as[Boolean]
-        joinDate <- row(Keys.JOIN_DATE).as[LocalDate]
-        expiryDate <- row(Keys.EXPIRY_DATE).as[LocalDate]
+          row.cell(Keys.MAIL_PREFERENCE).flatMap(
+            _.contentAs[MailPreference](CellDecoder.fromEnum[MailPreference]),
+          )
+        doNotCall <- row.cellAs[Boolean](Keys.DO_NOT_CALL)
+        joinDate <- row.cell(Keys.JOIN_DATE).flatMap(_.contentAs[LocalDate])
+        expiryDate <- row.cellAs[LocalDate](Keys.EXPIRY_DATE)
         membershipType <-
-          row(Keys.MEMBERSHIP_TYPE).as[Option[MembershipType]]
+          row.cell(Keys.MEMBERSHIP_TYPE).flatMap(_.contentAs[Option[
+            MembershipType,
+          ]](CellDecoder.optional(CellDecoder.fromEnum[MembershipType])))
         monthlyDuesStatus <-
-          row(Keys.MONTHLY_DUES_STATUS).as[MonthlyDuesStatus]
-        membershipStatus <-
-          row(Keys.MEMBERSHIP_STATUS).as[MembershipStatus]
+          row.cell(Keys.MONTHLY_DUES_STATUS).flatMap(_.contentAs[
+            MonthlyDuesStatus,
+          ](CellDecoder.fromEnum[MonthlyDuesStatus]))
+        membershipStatus <- row.cell(Keys.MEMBERSHIP_STATUS).flatMap(
+          _.contentAs[MembershipStatus](CellDecoder.fromEnum[MembershipStatus]),
+        )
       } yield national.CsvRecord(
         akId,
         NameComponentsUsa(

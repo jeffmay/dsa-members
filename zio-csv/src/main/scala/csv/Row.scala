@@ -33,7 +33,8 @@ private[csv] trait CsvEnv[EnvMin, +Env <: EnvMin] extends Any { self =>
   protected def getOption[T : Tag]: Option[T] = CsvEnv.getOption[T](toEnv)
 }
 
-trait RowInfo[EnvMin <: RowCtx, +Env <: EnvMin] extends Any with CsvEnv[EnvMin, Env] { self =>
+trait RowInfo[EnvMin <: RowCtx, +Env <: EnvMin]
+  extends Any with CsvEnv[EnvMin, Env] { self =>
   override protected type Self[+env <: EnvMin] <: RowInfo[EnvMin, env]
 
   def rowIndex: Long = toEnv.get[RowCtx].rowIndex
@@ -61,7 +62,9 @@ trait HeaderInfo[EnvMin, +Env <: EnvMin] extends Any with CsvEnv[EnvMin, Env] {
 }
 
 final case class Row[+H](toEnv: ZEnvironment[H with RowCtx])
-  extends AnyVal with HeaderInfo[RowCtx, H with RowCtx] with RowInfo[RowCtx, H with RowCtx] {
+  extends AnyVal
+  with HeaderInfo[RowCtx, H with RowCtx]
+  with RowInfo[RowCtx, H with RowCtx] {
 //  override protected type EnvMin = RowCtx
 //  override protected type Env = H with RowCtx
   override protected type Self[+env <: RowCtx] = Row[env]
@@ -78,7 +81,7 @@ final case class Row[+H](toEnv: ZEnvironment[H with RowCtx])
     }
   }
 
-  def apply(idx: Int): IO[InvalidColumnIndex, Cell[H]] = cells.flatMap {
+  def cell(idx: Int): IO[InvalidColumnIndex, Cell[H]] = cells.flatMap {
     cells =>
       // build an option of our cell
       if (cells.isDefinedAt(idx)) {
@@ -89,7 +92,7 @@ final case class Row[+H](toEnv: ZEnvironment[H with RowCtx])
       }
   }
 
-  def apply[C >: H : Tag](key: String)(implicit
+  def cell[C >: H : Tag](key: String)(implicit
     ev: C <:< HeaderCtx,
   ): IO[DecodingFailure, Cell[H]] =
     for {
@@ -101,6 +104,28 @@ final case class Row[+H](toEnv: ZEnvironment[H with RowCtx])
         }
       }
       // reuse the logic above to create our underlying
-      cellCtx <- this.apply(colIdx)
+      cellCtx <- cell(colIdx)
     } yield cellCtx
+
+  def cellAs[T]: Row.GetAsPartiallyApplied[H, T] =
+    new Row.GetAsPartiallyApplied[H, T](toEnv)
+}
+
+object Row {
+
+  class GetAsPartiallyApplied[+H, T] private[Row] (
+    private val env: ZEnvironment[H with RowCtx],
+  ) extends AnyVal {
+
+    def apply(idx: Int)(implicit
+      decoder: CellDecoder[T],
+    ): IO[DecodingFailure, T] =
+      Row(env).cell(idx).flatMap(_.contentAs[T])
+
+    def apply[C >: H : Tag](key: String)(implicit
+      decoder: CellDecoder[T],
+      ev: C <:< HeaderCtx,
+    ): IO[DecodingFailure, T] =
+      Row(env).cell[C](key).flatMap(_.contentAs[T])
+  }
 }

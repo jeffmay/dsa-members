@@ -61,9 +61,9 @@ object EnumCodec {
     parts.dropWhile(_.charAt(0).isLower).mkString(".")
   }
 
-  def nameOfEnum(enum: Enum[_]): String = enumeratumName(enum.getClass)
+  def nameOfEnum(enumeration: Enum[_]): String = enumeratumName(enumeration.getClass)
 
-  def nameOfEnum(enum: ValueEnum[_, _]): String = enumeratumName(enum.getClass)
+  def nameOfEnum(enumeration: ValueEnum[_, _]): String = enumeratumName(enumeration.getClass)
 
   def fromEnum[E <: EnumEntry](e: Enum[E]): EnumCodec[E] =
     new EnumCodec[E] {

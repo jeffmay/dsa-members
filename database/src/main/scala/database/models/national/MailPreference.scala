@@ -8,7 +8,7 @@ sealed abstract class MailPreference(override val value: String)
   extends StringEnumEntry
 
 object MailPreference
-  extends ValueEnumCompanion[MailPreference] with StringEnum[MailPreference] {
+  extends StringEnum[MailPreference] with ValueEnumCompanion[MailPreference] {
   override val values: IndexedSeq[MailPreference] = findValues
 
   final case object MemberCardOnly

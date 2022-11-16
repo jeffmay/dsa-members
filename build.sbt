@@ -34,19 +34,20 @@ def commonLibrary(
     resolvers ++= dependencies.resolvers,
     commonScalacOptions,
     // Add support for Scala 3-like type lambda syntax
-//    addCompilerPlugin(
-//      "org.typelevel" % "kind-projector" % "0.11.3" cross CrossVersion.full,
-//    ),
+    addCompilerPlugin(
+      "org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full,
+    ),
   )
 }
 
 lazy val csv = commonLibrary("zio-csv", Dependencies.csv, "zio")
   .dependsOn(enumeratumOps)
 
-lazy val csvInteropCats =
-  commonLibrary("zio-csv-interop-cats", Dependencies.csvInteropCats, "zio")
-    .dependsOn(csv)
+//lazy val csvInteropCats =
+//  commonLibrary("zio-csv-interop-cats", Dependencies.csvInteropCats, "zio")
+//    .dependsOn(csv)
 
+// TODO: Remove after upgrade to Scala 3
 lazy val enumeratumOps =
   commonLibrary("enumeratum-ops", Dependencies.enumeratumOps, "enumeratum")
 
