@@ -16,9 +16,11 @@ class catzSpec extends DisciplineSuite with ImplicitScalaCheckSeedForSuite {
   private val runtime: Runtime[Any] = Runtime.default
 
   private def evalEither[E, A](zio: IO[E, A]): Either[E, A] =
-    runtime.unsafeRun(zio.either)
+    evalOrThrow(zio.either)
 
-  private def evalOrThrow[E, A](zio: IO[E, A]): A = runtime.unsafeRun(zio)
+  // TODO: Require E <:< Throwable
+  private def evalOrThrow[E, A](zio: IO[E, A]): A =
+    Unsafe.unsafe(implicit unsafe => runtime.unsafe.run(zio).getOrThrowFiberFailure())
 
   checkAll(
     "CellDecoder[Int]",
@@ -39,8 +41,8 @@ class catzSpec extends DisciplineSuite with ImplicitScalaCheckSeedForSuite {
     )
 
   private[this] def containerDecoders[T : CellDecoder] = Seq[CellDecoder[_]](
-    CellDecoder.split(',').as[T].to(Seq),
-    CellDecoder.split("\\.".r).as[T].to(Seq),
+    CellDecoder.split(',').as[T].combineFailures.to(Seq),
+    CellDecoder.split("\\.".r).as[T].combineFailures.to(Seq),
   )
 
   for ((opName, transformation) <- transformations[Int]) {
@@ -64,12 +66,12 @@ class catzSpec extends DisciplineSuite with ImplicitScalaCheckSeedForSuite {
       val decoder =
         transformation(CellDecoder.failWithMessage[Int](reason))
       Prop.forAll { (i: Int) =>
-        val env = Cell.detachedEnv(i.toString)
+        val cell = Cell.detached(i.toString)
         val actual = evalEither {
-          decoder.decodeString(i.toString).provide(env)
+          decoder.decodeString(i.toString).provideEnvironment(cell.toEnv)
         }
         val expected = evalOrThrow {
-          CellDecodingFailure.fromMessage(reason).provide(env)
+          CellDecodingFailure.fromMessage(reason).provideEnvironment(cell.toEnv)
         }
         assertEquals(actual, Left(expected))
       }
@@ -96,10 +98,10 @@ class catzSpec extends DisciplineSuite with ImplicitScalaCheckSeedForSuite {
     "CellDecoder[String].prepare should appropriately prepend a string",
   ) {
     Prop.forAll { (prefix: String, content: String) =>
-      val env = Cell.detachedEnv(content)
+      val cell = Cell.detached(content)
       val decoder = CellDecoder[String].prepare(prefix + _)
       val actual = evalEither {
-        decoder.decodeString(content).provide(env)
+        decoder.decodeString(content).provideEnvironment(cell.toEnv)
       }
       val expected = prefix + content
       assertEquals(actual, Right(expected))
@@ -129,16 +131,18 @@ class catzSpec extends DisciplineSuite with ImplicitScalaCheckSeedForSuite {
   property("CellDecoder[Int].emap should appropriately transform the result with an operation that may fail") {
     Prop.forAll {
       (i: Int) =>
-        val env = Cell.detachedEnv(i.toString)
+        val cell = Cell.detached(i.toString)
         val decoder = CellDecoder[Int].emap { v =>
           if (v % 2 == 0) Right(v) else Left("Odd")
         }
         val expected = evalEither {
           if (i % 2 == 0) ZIO.succeed(i)
-          else CellDecodingFailure.fromMessage("Odd").flip.provide(env)
+          else CellDecodingFailure.fromMessage("Odd").flip.provideEnvironment(
+            cell.toEnv,
+          )
         }
         val actual = evalEither {
-          decoder.decodeString(i.toString).provide(env)
+          decoder.decodeString(i.toString).provideEnvironment(cell.toEnv)
         }
         assertEquals(actual, expected)
     }

@@ -85,7 +85,7 @@ object Dependencies {
   // this does not share common deps because it is intended to be a shared library
   final val csv = Deps(
     libraries = Seq(
-      catsCore,
+//      catsCore,
       scalaCsv,
       zio,
       zioNio,
@@ -98,6 +98,7 @@ object Dependencies {
   // this does not share common deps because it is intended to be a shared library
   final val csvInteropCats = Deps(
     libraries = csv.libraries ++ Seq(
+      catsCore,
       zioCats,
     ) ++ Seq(
       // Test-only dependencies

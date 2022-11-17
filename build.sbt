@@ -43,9 +43,9 @@ def commonLibrary(
 lazy val csv = commonLibrary("zio-csv", Dependencies.csv, "zio")
   .dependsOn(enumeratumOps)
 
-//lazy val csvInteropCats =
-//  commonLibrary("zio-csv-interop-cats", Dependencies.csvInteropCats, "zio")
-//    .dependsOn(csv)
+lazy val csvInteropCats =
+  commonLibrary("zio-csv-interop-cats", Dependencies.csvInteropCats, "zio")
+    .dependsOn(csv)
 
 // TODO: Remove after upgrade to Scala 3
 lazy val enumeratumOps =

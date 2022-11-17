@@ -15,7 +15,7 @@ trait CellDecoderInstances {
   protected def codecEqualityCheckCount: Int = 16
 
   val genGenericCellDecodingFailure: Gen[GenericCellDecodingFailure] =
-    Gen.const(GenericCellDecodingFailure(0, 0, "generated"))
+    Gen.const(GenericCellDecodingFailure(0, 0, None, "generated"))
 
   implicit val arbCellDecodingFailure: Arbitrary[CellDecodingFailure] =
     Arbitrary {
@@ -37,17 +37,18 @@ trait CellDecoderInstances {
     seed: Seed,
   ): Eq[CellDecoder[A]] = {
     val runtime = Runtime.default
-    (x, y) => {
-      val test = Prop.forAll { a: String =>
-        val cell = Cell.detached(a)
-        val xRes = runtime.unsafeRun(x.decodeCell(cell).either)
-        val yRes = runtime.unsafeRun(y.decodeCell(cell).either)
-        Eq[Either[DecodingFailure, A]].eqv(xRes, yRes)
+    (x, y) =>
+      Unsafe.unsafe { implicit unsafe =>
+        val test = Prop.forAll { a: String =>
+          val cell = Cell.detached(a)
+          val xRes = runtime.unsafe.run(x.decodeCell(cell).either).getOrThrow()
+          val yRes = runtime.unsafe.run(y.decodeCell(cell).either).getOrThrow()
+          Eq[Either[DecodingFailure, A]].eqv(xRes, yRes)
+        }
+        // try to prove the result with the current seed
+        val result =
+          Test.check(Test.Parameters.default.withInitialSeed(seed), test).passed
+        result
       }
-      // try to prove the result with the current seed
-      val result =
-        Test.check(Test.Parameters.default.withInitialSeed(seed), test).passed
-      result
-    }
   }
 }

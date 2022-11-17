@@ -287,13 +287,10 @@ object CellDecoder {
     final override def toString: String = s"CellDecoder.const($value)"
   }
 
-  def fail[A](failure: URIO[
-    CellDecoder.MinCtx,
-    CellDecodingFailure,
-  ]): CellDecoder[A] =
-    failWith(_ => failure)
+  def fail[A](failure: CellDecodingFailure): CellDecoder[A] =
+    failWithZIO(_ => ZIO.succeed(failure))
 
-  def failWith[A](failWith: String => URIO[
+  def failWithZIO[A](failWith: String => URIO[
     CellDecoder.MinCtx,
     CellDecodingFailure,
   ]): CellDecoder[A] = new CellDecoder[A] {
@@ -316,7 +313,7 @@ object CellDecoder {
       CellDecodingFailure,
       A,
     ] =
-      failWith[A] { _ =>
+      failWithZIO[A] { _ =>
         CellDecodingFailure.fromMessage(reason)
       }.decodeString(content)
     override def toString: String = s"CellDecoder.failWithMessage($reason)"
