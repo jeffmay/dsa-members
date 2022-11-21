@@ -5,8 +5,8 @@ import database.models.national._
 import database.models.{Address, EmailAddress, NameComponentsUsa, PhoneNumber}
 import jobs.{national, CommonDecoders}
 
-import zio.Tag
-import zio.csv.{CellDecoder, HeaderCtx, RowCtx, RowDecoder}
+import zio._
+import zio.csv._
 
 import java.time.LocalDate
 
@@ -30,7 +30,7 @@ final case class CsvRecord(
 
 object CsvRecord extends CommonDecoders {
 
-  final object Keys {
+  object Keys {
     final val AK_ID = "AK_ID"
     final val FIRST_NAME = "first_name"
     final val MIDDLE_NAME = "middle_name"
@@ -66,11 +66,30 @@ object CsvRecord extends CommonDecoders {
     final val DSA_CHAPTER = "DSA_chapter"
   }
 
-  implicit val decodeAkID: CellDecoder[AkID] =
-    CellDecoder.fromStringTotal(AkID(_))
+  given decodeAkID: CellDecoder[AkID] = CellDecoder.fromStringTotal(AkID(_))
 
-  implicit val decodeWithHeaders: RowDecoder.FromHeaderInfo[CsvRecord] = {
-    row =>
+  given decodeMonthlyDuesStatus: CellDecoder[MonthlyDuesStatus] = ???
+
+  // given decodeMonthlyDuesStatus: CellDecoder[MonthlyDuesStatus] with
+  //   private val valuesByNameLowercase = MonthlyDuesStatus.values.view.map(entry => entry -> entry.value.toLowerCase).toMap
+  //   override def decodeString(content: String): ZIO[
+  //     CellDecoder.MinCtx,
+  //     CellDecodingFailure,
+  //     MonthlyDuesStatus,
+  //   ] = ZIO.fromEither {
+  //     valuesByNameLowercase.get(content.toLowerCase.trim).toRight {
+  //       CellDecodingFailure.fromMessage()
+  //     }
+  //   }
+
+  given decodeMailPreference: CellDecoder[MailPreference] = ???
+
+  given decodeMembershipType: CellDecoder[MembershipType] = ???
+
+  given decodeMembershipStatus: CellDecoder[MembershipStatus] = ???
+
+  implicit val decodeWithHeaders: RowDecoder.FromHeaderInfo[CsvRecord] = RowDecoder {
+    (row: Row[HeaderCtx]) =>
       for {
         akId <- row.cellAs[AkID](Keys.AK_ID)
         firstName <- row.cellAs[String](Keys.FIRST_NAME)
@@ -91,24 +110,13 @@ object CsvRecord extends CommonDecoders {
         homePhone <- row.cellAs[Seq[PhoneNumber]](Keys.HOME_PHONE)
         workPhone <- row.cellAs[Seq[PhoneNumber]](Keys.WORK_PHONE)
         emailAddress <- row.cellAs[Option[EmailAddress]](Keys.EMAIL)
-        mailPreference <-
-          row.cell(Keys.MAIL_PREFERENCE).flatMap(
-            _.contentAs[MailPreference](CellDecoder.fromEnum[MailPreference]),
-          )
+        mailPreference <- row.cellAs[MailPreference](Keys.MAIL_PREFERENCE)
         doNotCall <- row.cellAs[Boolean](Keys.DO_NOT_CALL)
-        joinDate <- row.cell(Keys.JOIN_DATE).flatMap(_.contentAs[LocalDate])
+        joinDate <- row.cellAs[LocalDate](Keys.JOIN_DATE)
         expiryDate <- row.cellAs[LocalDate](Keys.EXPIRY_DATE)
-        membershipType <-
-          row.cell(Keys.MEMBERSHIP_TYPE).flatMap(_.contentAs[Option[
-            MembershipType,
-          ]](CellDecoder.optional(CellDecoder.fromEnum[MembershipType])))
-        monthlyDuesStatus <-
-          row.cell(Keys.MONTHLY_DUES_STATUS).flatMap(_.contentAs[
-            MonthlyDuesStatus,
-          ](CellDecoder.fromEnum[MonthlyDuesStatus]))
-        membershipStatus <- row.cell(Keys.MEMBERSHIP_STATUS).flatMap(
-          _.contentAs[MembershipStatus](CellDecoder.fromEnum[MembershipStatus]),
-        )
+        membershipType <- row.cellAs[Option[MembershipType]](Keys.MEMBERSHIP_TYPE)
+        monthlyDuesStatus <- row.cellAs[MonthlyDuesStatus](Keys.MONTHLY_DUES_STATUS)
+        membershipStatus <- row.cellAs[MembershipStatus](Keys.MEMBERSHIP_STATUS)
       } yield national.CsvRecord(
         akId,
         NameComponentsUsa(

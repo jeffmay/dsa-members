@@ -114,9 +114,9 @@ sealed trait CellDecodingFailure extends DecodingFailure {
 
 object CellDecodingFailure {
 
-  @inline def buildFromContextValues[F](
+  def buildFromContextValues[F](
     build: (Long, Int, Option[String]) => F,
-  ): URIO[CellDecoder.MinCtx, F] = {
+  ): URIO[CellDecoder.MinCtx, F] =
     for {
       env <- ZIO.environment[Any]
       row <- ZIO.service[RowCtx]
@@ -128,10 +128,8 @@ object CellDecodingFailure {
         _.columnNameByIndex.get(cell.columnIndex),
       ),
     )
-  }
 
-  /** Create [[CellDecodingFailure]] without a known type using the [[CellDecoder.MinCtx]] and the given message.
-    */
+  /** Create [[CellDecodingFailure]] without a known type using the [[CellDecoder.MinCtx]] and the given message. */
   def fromMessage(
     reason: String,
   ): URIO[CellDecoder.MinCtx, CellDecodingFailure] = {
@@ -140,8 +138,7 @@ object CellDecodingFailure {
     }
   }
 
-  /** Convert an exception into a [[CellDecodingException]] of a given type using the [[CellDecoder.MinCtx]].
-    */
+  /** Convert an exception into a [[CellDecodingException]] of a given type using the [[CellDecoder.MinCtx]]. */
   def fromExceptionDecodingAs[A : Tag](
     cause: Throwable,
   ): URIO[CellDecoder.MinCtx, CellDecodingTypedFailure[A]] =

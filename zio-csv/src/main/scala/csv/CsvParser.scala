@@ -1,7 +1,7 @@
 package zio
 package csv
 
-import stream.{ZPipeline, ZStream}
+import zio.stream.{ZPipeline, ZStream}
 
 import com.github.tototoshi.csv.CSVFormat
 

@@ -3,8 +3,8 @@ name := "dsa-members-root"
 ThisBuild / organization := "org.dsasf"
 ThisBuild / organizationName := "San Francisco Democratic Socialists of America"
 
-ThisBuild / scalaVersion := "2.13.10"
-//ThisBuild / scalaVersion := "3.0.0-RC1"
+// ThisBuild / scalaVersion := "2.13.10"
+ThisBuild / scalaVersion := "3.2.1"
 //ThisBuild / useScala3doc := true
 
 // Run the formatter on compile to avoid checking in un-formatted code
@@ -17,8 +17,8 @@ Global / excludeLintKeys += idePackagePrefix
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
 val commonScalacOptions = scalacOptions ++= Seq(
+  "-explain",
   "-deprecation",
-  "-Ymacro-annotations",
 )
 
 def commonLibrary(
@@ -34,22 +34,23 @@ def commonLibrary(
     resolvers ++= dependencies.resolvers,
     commonScalacOptions,
     // Add support for Scala 3-like type lambda syntax
-    addCompilerPlugin(
-      "org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full,
-    ),
+//    addCompilerPlugin(
+//      "org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full,
+//    ),
   )
 }
 
 lazy val csv = commonLibrary("zio-csv", Dependencies.csv, "zio")
-  .dependsOn(enumeratumOps)
+//  .dependsOn(enumeratumOps)
 
-lazy val csvInteropCats =
-  commonLibrary("zio-csv-interop-cats", Dependencies.csvInteropCats, "zio")
-    .dependsOn(csv)
+// lazy val csvInteropCats =
+  // commonLibrary("zio-csv-interop-cats", Dependencies.csvInteropCats, "zio")
+    // .dependsOn(csv)
 
 // TODO: Remove after upgrade to Scala 3
-lazy val enumeratumOps =
-  commonLibrary("enumeratum-ops", Dependencies.enumeratumOps, "enumeratum")
+// lazy val enumeratumOps =
+//   commonLibrary("enumeratum-ops", Dependencies.enumeratumOps, "enumeratum")
+//     .settings(scalaVersion := "2.13.10")
 
 def commonProject(
   id: String,
@@ -78,14 +79,10 @@ def commonProject(
     )
 
 lazy val api = commonProject("api", Dependencies.api)
-  .dependsOn(
-    database,
-  )
+  .dependsOn(database)
 
 lazy val database = commonProject("database", Dependencies.database)
-  .dependsOn(
-    enumeratumOps,
-  )
+//  .dependsOn(enumeratumOps)
 
 lazy val jobs = commonProject("jobs", Dependencies.jobs)
   .dependsOn(

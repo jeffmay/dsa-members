@@ -92,8 +92,7 @@ final private class CatsCellDecoderMonadError
   override def tailRecM[A, B](
     a: A,
   )(f: A => CellDecoder[Either[A, B]]): CellDecoder[B] = { content =>
-    MonadError[ZIO[MinCtx, CellDecodingFailure, *], CellDecodingFailure]
-      .tailRecM[A, B](a)(f.andThen(_.decodeString(content)))
+    MonadError.apply[ZIO[MinCtx, CellDecodingFailure, _], CellDecodingFailure].tailRecM[A, B](a)(f.andThen(_.decodeString(content)))
   }
 
   override def raiseError[A](e: CellDecodingFailure): CellDecoder[A] =
@@ -104,5 +103,5 @@ final private class CatsCellDecoderMonadError
   */
 case object EqProduct extends Eq[Product] {
   override def eqv(x: Product, y: Product): Boolean = x == y
-  @inline def apply[P <: Product]: Eq[P] = this.asInstanceOf[Eq[P]]
+  inline def apply[P <: Product]: Eq[P] = this.asInstanceOf[Eq[P]]
 }

@@ -3,7 +3,6 @@ package jobs
 
 import database.models.{EmailAddress, PhoneNumber}
 
-import enumeratum.ops.{EnumCodec, UnknownEntryOr}
 import zio.ZIO
 import zio.csv.{CellDecoder, CellDecodingFailure}
 
@@ -15,13 +14,13 @@ import scala.util.control.NoStackTrace
 
 trait CommonDecoders {
 
-  implicit def decodeUnknownEntryOr[
-    E : EnumCodec,
-  ]: CellDecoder[
-    UnknownEntryOr[E],
-  ] = CellDecoder.fromStringTotal { str =>
-    EnumCodec[E].findByNameInsensitive(str)
-  }
+  // implicit def decodeUnknownEntryOr[
+  //   E : EnumCodec,
+  // ]: CellDecoder[
+  //   UnknownEntryOr[E],
+  // ] = CellDecoder.fromStringTotal { str =>
+  //   EnumCodec[E].findByNameInsensitive(str)
+  // }
 
   implicit val decodePhoneNumber: CellDecoder[PhoneNumber] =
     CellDecoder.fromEffect { content =>

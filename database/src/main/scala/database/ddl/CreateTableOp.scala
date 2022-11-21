@@ -1,14 +1,14 @@
-package org.dsasf.members
-package database.ddl
+// package org.dsasf.members
+// package database.ddl
 
-import doobie._
+// import doobie._
 
-sealed trait TableOp
+// sealed trait TableOp
 
-trait CreateTableOp extends TableOp {
-  val createTable: Fragment
-}
+// trait CreateTableOp extends TableOp {
+//   val createTable: Fragment
+// }
 
-trait DropTableOp extends TableOp {
-  val dropTable: Fragment
-}
+// trait DropTableOp extends TableOp {
+//   val dropTable: Fragment
+// }

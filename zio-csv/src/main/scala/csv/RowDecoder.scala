@@ -9,13 +9,13 @@ trait RowDecoder[-R, +A] {
 
 object RowDecoder {
   type FromPositionOnly[+A] = RowDecoder[Any, A]
-  final object FromPositionOnly {
-    @inline def apply[A : FromPositionOnly]: FromPositionOnly[A] = implicitly
+  object FromPositionOnly {
+    inline def apply[A : FromPositionOnly]: FromPositionOnly[A] = implicitly
   }
 
   type FromHeaderInfo[+A] = RowDecoder[HeaderCtx, A]
-  final object FromHeaderInfo {
-    @inline def apply[A : FromHeaderInfo]: FromHeaderInfo[A] = implicitly
+  object FromHeaderInfo {
+    inline def apply[A : FromHeaderInfo]: FromHeaderInfo[A] = implicitly
   }
 
   /** Build a [[RowDecoder]] with a given function, rather than rely on converting
@@ -24,9 +24,16 @@ object RowDecoder {
     * This is helpful for getting better compiler error messages when variance would
     * make your row or result type not match the expected return type.
     */
-  def build[R, A](
+  def build[R, A : Tag](
     decoder: Row[R] => RowDecoder.Result[A],
-  ): RowDecoder[R, A] = decoder.apply
+    details: String = "",
+  ): RowDecoder[R, A] = new RowDecoder[R, A] {
+    override def decode(row: Row[R]): Result[A] = decoder(row)
+    override lazy val toString: String = {
+      val typeName = Tag[A].tag.shortName
+      s"RowDecoder[$typeName].build($details)"
+    }
+  }
 
   implicit def decodeEither[R, A](implicit
     decoder: RowDecoder[R, A],
@@ -50,7 +57,7 @@ object RowDecoder {
 
   type Result[+A] = IO[DecodingFailure, A]
 
-  @inline def apply[R, A](implicit
+  inline def apply[R, A](implicit
     decoder: RowDecoder[R, A],
   ): RowDecoder[R, A] = decoder
 }

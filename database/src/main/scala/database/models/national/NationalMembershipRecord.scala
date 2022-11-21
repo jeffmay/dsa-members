@@ -3,8 +3,6 @@ package database.models.national
 
 import database.models.{Address, Name, PhoneNumber}
 
-import io.estatico.newtype.macros.newtype
-
 import java.time.LocalDate
 
 case class NationalMembershipRecord(
@@ -25,8 +23,12 @@ case class NationalMembershipRecord(
 
 object NationalMembershipRecord {
 
-  @newtype case class Id(toInt: Int)
+  opaque type Id = Int
+  object Id {
+    def apply(value: Int): Id = value
+  }
 
-  implicit val naturalOrder: Ordering[NationalMembershipRecord] =
-    Ordering.by(_.id.toInt)
+  extension (id: Id) inline def value: Int = id
+
+  given naturalOrder: Ordering[NationalMembershipRecord] = Ordering.by(_.id.value)
 }

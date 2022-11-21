@@ -1,17 +1,12 @@
 package zio
 package csv
 
-import enumeratum.ops.EnumCodec
-
 import java.time.{Instant, LocalDate, LocalDateTime, ZonedDateTime}
 import scala.collection.Factory
 import scala.collection.immutable.ArraySeq
 import scala.util.Try
 import scala.util.matching.Regex
 
-// TODO: Finish adding toString
-
-// TODO: Create CellDecoder that requires a header?
 trait CellDecoder[+A] {
 
   /** Decode the given cell contents into the expected type or return a [[CellDecodingFailure]]. */
@@ -96,16 +91,14 @@ trait CellDecoder[+A] {
 }
 
 object CellDecoder {
-  type Ctx[+H] = H with RowCtx with CellCtx
+  type Ctx[+H] = H & RowCtx & CellCtx
   type MinCtx = Ctx[Any]
   type ResultFromHeader[-H, +A] = ZIO[Ctx[H], CellDecodingFailure, A]
   type Result[+A] = ResultFromHeader[Any, A]
 
-  @inline def apply[A](implicit
-    decoder: CellDecoder[A],
-  ): CellDecoder[A] = decoder
+  inline def apply[A : CellDecoder]: CellDecoder[A] = summon[CellDecoder[A]]
 
-  @inline def split(delimiter: Char): SplitString =
+  inline def split(delimiter: Char): SplitString =
     split(delimiter, keepEmpty = false)
 
   def split(delimiter: Char, keepEmpty: Boolean): SplitString = {
@@ -117,7 +110,7 @@ object CellDecoder {
     )
   }
 
-  @inline def split(re: Regex): SplitString = split(re, keepEmpty = false)
+  inline def split(re: Regex): SplitString = split(re, keepEmpty = false)
 
   def split(re: Regex, keepEmpty: Boolean): SplitString = {
     val adjust: ArraySeq[String] => ArraySeq[String] =
@@ -154,7 +147,7 @@ object CellDecoder {
       content => {
         split(content).flatMap { pieces =>
           val results = pieces.map(s => CellDecoder[A].decodeString(s).either)
-          ZIO.mergeAll(results)(Vector.empty[Either[CellDecodingFailure, A]]) {
+          ZIO.mergeAll(results)(Chunk.empty[Either[CellDecodingFailure, A]]) {
             (acc, next) => acc :+ next
           }
         }
@@ -261,24 +254,24 @@ object CellDecoder {
         s"CellDecoder.optional(${CellDecoder[A].toString})"
     }
 
-  // TODO: Replace with Scala 3 enum support
+  // TODO: Replace with Scala 3 enum support using a macro or something?
 
-  /** Does a match on the enum values based on the [[EnumCodec]] */
-  implicit def fromEnum[E : EnumCodec : Tag]: CellDecoder[E] =
-    new CellDecoder[E] {
-      override def decodeString(content: String): ZIO[
-        MinCtx,
-        CellDecodingFailure,
-        E,
-      ] =
-        ZIO.fromEither {
-          EnumCodec[E].findByNameInsensitive(content).toEither
-        }.flatMapError {
-          CellDecodingFailure.fromExceptionDecodingAs[E](_)
-        }
-      override def toString: String =
-        s"CellDecoder.fromEnum[${EnumCodec[E].enumName}]"
-    }
+//  /** Does a match on the enum values based on the [[EnumCodec]] */
+//  implicit def fromEnum[E <: Enum[_] : Tag]: CellDecoder[E] =
+//    new CellDecoder[E] {
+//      override def decodeString(content: String): ZIO[
+//        MinCtx,
+//        CellDecodingFailure,
+//        E,
+//      ] =
+//        ZIO.fromEither {
+//          EnumCodec[E].findByNameInsensitive(content).toEither
+//        }.flatMapError {
+//          CellDecodingFailure.fromExceptionDecodingAs[E](_)
+//        }
+//      override def toString: String =
+//        s"CellDecoder.fromEnum[${EnumCodec[E].enumName}]"
+//    }
 
   def const[A](value: A): CellDecoder[A] = new CellDecoder[A] {
     final override def decodeString(

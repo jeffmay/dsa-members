@@ -61,6 +61,9 @@ trait HeaderInfo[EnvMin, +Env <: EnvMin] extends Any with CsvEnv[EnvMin, Env] {
     build(toEnv.add[HeaderCtx](headerCtx))
 }
 
+type AnyRow = Row[Any]
+type RowWithColNames = Row[HeaderCtx]
+
 final case class Row[+H](toEnv: ZEnvironment[H with RowCtx])
   extends AnyVal
   with HeaderInfo[RowCtx, H with RowCtx]

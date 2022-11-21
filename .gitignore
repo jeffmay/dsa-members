@@ -6,6 +6,14 @@ tmp/
 .idea
 *.iml
 
+# Metals / Bloop
+.metals
+**/.bloop/
+**/metals.sbt
+
+# VSCode
+.vscode
+
 # sbt
 .bsp/
 target/
