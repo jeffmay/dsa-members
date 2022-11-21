@@ -4,24 +4,30 @@ package csv
 import java.time.{Instant, LocalDate, LocalDateTime, ZonedDateTime}
 import scala.collection.Factory
 import scala.collection.immutable.ArraySeq
+import scala.reflect.ClassTag
 import scala.util.Try
 import scala.util.matching.Regex
 
 trait CellDecoder[+A] {
 
-  /** Decode the given cell contents into the expected type or return a [[CellDecodingFailure]]. */
+  /** Decode the given cell contents into the expected type or return a
+    * [[CellDecodingFailure]].
+    */
   def decodeString(content: String): ZIO[
     CellDecoder.MinCtx,
     CellDecodingFailure,
     A,
   ]
 
-  /** Decode the given [[Cell]] into the expected type or return a [[CellDecodingFailure]]. */
+  /** Decode the given [[Cell]] into the expected type or return a
+    * [[CellDecodingFailure]].
+    */
   final def decodeCell(cell: Cell[Any]): IO[DecodingFailure, A] =
     decodeString(cell.toEnv.get[CellCtx].content).provideEnvironment(cell.toEnv)
 
-  /** Apply a function to the decoded result to get a new decoder, use it to decode the cell, and don't
-    * catch any exceptions thrown while building the decoder.
+  /** Apply a function to the decoded result to get a new decoder, use it to
+    * decode the cell, and don't catch any exceptions thrown while building the
+    * decoder.
     */
   final def flatMap[B](fn: A => CellDecoder[B]): CellDecoder[B] = { content =>
     decodeString(content).flatMap { a =>
@@ -30,8 +36,9 @@ trait CellDecoder[+A] {
     }
   }
 
-  /** Apply a function to the decoded result to get a new decoder, use it to decode the cell, and wrap any
-    * caught exceptions from building the decoder in a [[CellDecodingException]] of the final expected type.
+  /** Apply a function to the decoded result to get a new decoder, use it to
+    * decode the cell, and wrap any caught exceptions from building the decoder
+    * in a [[CellDecodingException]] of the final expected type.
     */
   final def flatMapSafe[B : Tag](fn: A => CellDecoder[B]): CellDecoder[B] = {
     content =>
@@ -46,8 +53,9 @@ trait CellDecoder[+A] {
       }
   }
 
-  /** If this decoder fails, fall back to the given decoder and return either the successful result
-    * of this decoder or the final result of the given decoder.
+  /** If this decoder fails, fall back to the given decoder and return either
+    * the successful result of this decoder or the final result of the given
+    * decoder.
     */
   final def or[B >: A](decoder: => CellDecoder[B]): CellDecoder[B] =
     CellDecoder.fromEffect { content =>
@@ -64,7 +72,9 @@ trait CellDecoder[+A] {
     decodeString(content).map(fn)
   }
 
-  /** Apply a function to the decoded result that can return a failure synchronously. */
+  /** Apply a function to the decoded result that can return a failure
+    * synchronously.
+    */
   final def emap[B](fn: A => Either[String, B]): CellDecoder[B] = { content =>
     decodeString(content).flatMap { a =>
       ZIO.fromEither(fn(a)).flatMapError { reason =>
@@ -73,7 +83,9 @@ trait CellDecoder[+A] {
     }
   }
 
-  /** Apply a function to the decoded result and wrap any exceptions in a [[CellDecodingException]]. */
+  /** Apply a function to the decoded result and wrap any exceptions in a
+    * [[CellDecodingException]].
+    */
   final def mapSafe[B : Tag](fn: A => B): CellDecoder[B] = { content =>
     decodeString(content).flatMap { a =>
       ZIO.fromTry(Try(fn(a))).flatMapError { ex =>
@@ -144,14 +156,13 @@ object CellDecoder {
 
     def as[A : CellDecoder]: SplitAs[A] = new SplitAs[A](
       separator,
-      content => {
+      content =>
         split(content).flatMap { pieces =>
           val results = pieces.map(s => CellDecoder[A].decodeString(s).either)
           ZIO.mergeAll(results)(Chunk.empty[Either[CellDecodingFailure, A]]) {
             (acc, next) => acc :+ next
           }
-        }
-      },
+        },
     )
   }
 
@@ -254,24 +265,56 @@ object CellDecoder {
         s"CellDecoder.optional(${CellDecoder[A].toString})"
     }
 
-  // TODO: Replace with Scala 3 enum support using a macro or something?
+  // TODO: How to avoid Java reflection when handling enumerations
+  type EnumLike[V] = Singleton & {
+    def values: Array[V]
+  }
 
-//  /** Does a match on the enum values based on the [[EnumCodec]] */
-//  implicit def fromEnum[E <: Enum[_] : Tag]: CellDecoder[E] =
-//    new CellDecoder[E] {
-//      override def decodeString(content: String): ZIO[
-//        MinCtx,
-//        CellDecodingFailure,
-//        E,
-//      ] =
-//        ZIO.fromEither {
-//          EnumCodec[E].findByNameInsensitive(content).toEither
-//        }.flatMapError {
-//          CellDecodingFailure.fromExceptionDecodingAs[E](_)
-//        }
-//      override def toString: String =
-//        s"CellDecoder.fromEnum[${EnumCodec[E].enumName}]"
-//    }
+  def enumeration[E <: EnumLike[V], V](
+    enumObject: E,
+  ): EnumPartiallyApplied[E, V] =
+    new EnumPartiallyApplied(enumObject)
+
+  final class EnumPartiallyApplied[E <: EnumLike[V], V](
+    private val enumObject: E,
+  ) extends AnyVal {
+
+    def fromStringInsensitive(key: V => String)(implicit
+      clsTag: ClassTag[V],
+    ): CellDecoder[V] = new CellDecoder[V] {
+
+      private val enumShortName = clsTag.runtimeClass.getTypeName
+
+      private val valuesByNameLowercase = {
+        val values = clsTag.runtimeClass.getEnumConstants
+        require(
+          values.nonEmpty,
+          s"Enum $enumShortName invalid. At least one enum case is required.",
+        )
+        values.view.map {
+          case entry: V => key(entry).toLowerCase -> entry
+          case other => throw new IllegalStateException(
+              s"Expected enum value of $enumShortName, but found $other",
+            )
+        }.toMap
+      }
+
+      override def decodeString(content: String): ZIO[
+        CellDecoder.MinCtx,
+        CellDecodingFailure,
+        V,
+      ] = ZIO.fromOption {
+        valuesByNameLowercase.get(content.toLowerCase.trim)
+      }.flatMapError { _ =>
+        CellDecodingFailure.fromMessage(
+          s"Unrecognized enum value for $enumShortName",
+        )
+      }
+
+      override def toString: String =
+        s"CellDecoder[$enumShortName].enumFromStringInsensitive"
+    }
+  }
 
   def const[A](value: A): CellDecoder[A] = new CellDecoder[A] {
     final override def decodeString(

@@ -68,88 +68,84 @@ object CsvRecord extends CommonDecoders {
 
   given decodeAkID: CellDecoder[AkID] = CellDecoder.fromStringTotal(AkID(_))
 
-  given decodeMonthlyDuesStatus: CellDecoder[MonthlyDuesStatus] = ???
+  given decodeMonthlyDuesStatus: CellDecoder[MonthlyDuesStatus] =
+    CellDecoder.enumeration(MonthlyDuesStatus).fromStringInsensitive(_.value)
 
-  // given decodeMonthlyDuesStatus: CellDecoder[MonthlyDuesStatus] with
-  //   private val valuesByNameLowercase = MonthlyDuesStatus.values.view.map(entry => entry -> entry.value.toLowerCase).toMap
-  //   override def decodeString(content: String): ZIO[
-  //     CellDecoder.MinCtx,
-  //     CellDecodingFailure,
-  //     MonthlyDuesStatus,
-  //   ] = ZIO.fromEither {
-  //     valuesByNameLowercase.get(content.toLowerCase.trim).toRight {
-  //       CellDecodingFailure.fromMessage()
-  //     }
-  //   }
+  given decodeMailPreference: CellDecoder[MailPreference] =
+    CellDecoder.enumeration(MailPreference).fromStringInsensitive(_.value)
 
-  given decodeMailPreference: CellDecoder[MailPreference] = ???
+  given decodeMembershipType: CellDecoder[MembershipType] =
+    CellDecoder.enumeration(MembershipType).fromStringInsensitive(_.value)
 
-  given decodeMembershipType: CellDecoder[MembershipType] = ???
+  given decodeMembershipStatus: CellDecoder[MembershipStatus] =
+    CellDecoder.enumeration(MembershipStatus).fromStringInsensitive(_.value)
 
-  given decodeMembershipStatus: CellDecoder[MembershipStatus] = ???
-
-  implicit val decodeWithHeaders: RowDecoder.FromHeaderInfo[CsvRecord] = RowDecoder {
-    (row: Row[HeaderCtx]) =>
-      for {
-        akId <- row.cellAs[AkID](Keys.AK_ID)
-        firstName <- row.cellAs[String](Keys.FIRST_NAME)
-        middleName <- row.cellAs[String](Keys.MIDDLE_NAME)
-        lastName <- row.cellAs[String](Keys.LAST_NAME)
-        suffix <- row.cellAs[String](Keys.SUFFIX)
-        billingAddressLine1 <- row.cellAs[String](Keys.BILLING_ADDRESS_LINE_1)
-        billingAddressLine2 <- row.cellAs[String](Keys.BILLING_ADDRESS_LINE_2)
-        billingCity <- row.cellAs[String](Keys.BILLING_CITY)
-        billingState <- row.cellAs[String](Keys.BILLING_STATE)
-        billingZip <- row.cellAs[String](Keys.BILLING_ZIP)
-        mailingAddressLine1 <- row.cellAs[String](Keys.MAILING_ADDRESS_LINE_1)
-        mailingAddressLine2 <- row.cellAs[String](Keys.MAILING_ADDRESS_LINE_2)
-        mailingCity <- row.cellAs[String](Keys.MAILING_CITY)
-        mailingState <- row.cellAs[String](Keys.MAILING_STATE)
-        mailingZip <- row.cellAs[String](Keys.MAILING_ZIP)
-        mobilePhone <- row.cellAs[Seq[PhoneNumber]](Keys.MOBILE_PHONE)
-        homePhone <- row.cellAs[Seq[PhoneNumber]](Keys.HOME_PHONE)
-        workPhone <- row.cellAs[Seq[PhoneNumber]](Keys.WORK_PHONE)
-        emailAddress <- row.cellAs[Option[EmailAddress]](Keys.EMAIL)
-        mailPreference <- row.cellAs[MailPreference](Keys.MAIL_PREFERENCE)
-        doNotCall <- row.cellAs[Boolean](Keys.DO_NOT_CALL)
-        joinDate <- row.cellAs[LocalDate](Keys.JOIN_DATE)
-        expiryDate <- row.cellAs[LocalDate](Keys.EXPIRY_DATE)
-        membershipType <- row.cellAs[Option[MembershipType]](Keys.MEMBERSHIP_TYPE)
-        monthlyDuesStatus <- row.cellAs[MonthlyDuesStatus](Keys.MONTHLY_DUES_STATUS)
-        membershipStatus <- row.cellAs[MembershipStatus](Keys.MEMBERSHIP_STATUS)
-      } yield national.CsvRecord(
-        akId,
-        NameComponentsUsa(
-          firstName,
-          middleName,
-          lastName,
-          suffix,
-        ),
-        Address(
-          billingAddressLine1,
-          billingAddressLine2,
-          billingCity,
-          billingState,
-          billingZip,
-        ),
-        Address(
-          mailingAddressLine1,
-          mailingAddressLine2,
-          mailingCity,
-          mailingState,
-          mailingZip,
-        ),
-        mobilePhone,
-        homePhone,
-        workPhone,
-        emailAddress,
-        mailPreference,
-        doNotCall,
-        joinDate,
-        expiryDate,
-        membershipType,
-        monthlyDuesStatus,
-        membershipStatus,
-      )
-  }
+  given decodeWithHeaders: RowDecoder.FromHeaderInfo[CsvRecord] =
+    RowDecoder {
+      (row: Row[HeaderCtx]) =>
+        for {
+          akId <- row.cellAs[AkID](Keys.AK_ID)
+          firstName <- row.cellAs[String](Keys.FIRST_NAME)
+          middleName <- row.cellAs[String](Keys.MIDDLE_NAME)
+          lastName <- row.cellAs[String](Keys.LAST_NAME)
+          suffix <- row.cellAs[String](Keys.SUFFIX)
+          billingAddressLine1 <- row.cellAs[String](Keys.BILLING_ADDRESS_LINE_1)
+          billingAddressLine2 <- row.cellAs[String](Keys.BILLING_ADDRESS_LINE_2)
+          billingCity <- row.cellAs[String](Keys.BILLING_CITY)
+          billingState <- row.cellAs[String](Keys.BILLING_STATE)
+          billingZip <- row.cellAs[String](Keys.BILLING_ZIP)
+          mailingAddressLine1 <- row.cellAs[String](Keys.MAILING_ADDRESS_LINE_1)
+          mailingAddressLine2 <- row.cellAs[String](Keys.MAILING_ADDRESS_LINE_2)
+          mailingCity <- row.cellAs[String](Keys.MAILING_CITY)
+          mailingState <- row.cellAs[String](Keys.MAILING_STATE)
+          mailingZip <- row.cellAs[String](Keys.MAILING_ZIP)
+          mobilePhone <- row.cellAs[Seq[PhoneNumber]](Keys.MOBILE_PHONE)
+          homePhone <- row.cellAs[Seq[PhoneNumber]](Keys.HOME_PHONE)
+          workPhone <- row.cellAs[Seq[PhoneNumber]](Keys.WORK_PHONE)
+          emailAddress <- row.cellAs[Option[EmailAddress]](Keys.EMAIL)
+          mailPreference <- row.cellAs[MailPreference](Keys.MAIL_PREFERENCE)
+          doNotCall <- row.cellAs[Boolean](Keys.DO_NOT_CALL)
+          joinDate <- row.cellAs[LocalDate](Keys.JOIN_DATE)
+          expiryDate <- row.cellAs[LocalDate](Keys.EXPIRY_DATE)
+          membershipType <-
+            row.cellAs[Option[MembershipType]](Keys.MEMBERSHIP_TYPE)
+          monthlyDuesStatus <-
+            row.cellAs[MonthlyDuesStatus](Keys.MONTHLY_DUES_STATUS)
+          membershipStatus <-
+            row.cellAs[MembershipStatus](Keys.MEMBERSHIP_STATUS)
+        } yield national.CsvRecord(
+          akId,
+          NameComponentsUsa(
+            firstName,
+            middleName,
+            lastName,
+            suffix,
+          ),
+          Address(
+            billingAddressLine1,
+            billingAddressLine2,
+            billingCity,
+            billingState,
+            billingZip,
+          ),
+          Address(
+            mailingAddressLine1,
+            mailingAddressLine2,
+            mailingCity,
+            mailingState,
+            mailingZip,
+          ),
+          mobilePhone,
+          homePhone,
+          workPhone,
+          emailAddress,
+          mailPreference,
+          doNotCall,
+          joinDate,
+          expiryDate,
+          membershipType,
+          monthlyDuesStatus,
+          membershipStatus,
+        )
+    }
 }
