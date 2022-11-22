@@ -2,8 +2,11 @@ package zio
 package csv
 import csv.Cell.Ctx
 
+/** A cell with the minimum available context. */
+type AnyCell = Cell[Any]
+
 object Cell {
-  type Ctx[+H] = H with CellCtx with RowCtx
+  type Ctx[+H] = H & CellCtx & RowCtx
 
   /** Creates an [[Cell]] containing 1 row and 1 column with no header where the 1 cell contains the given content.
     */
@@ -14,7 +17,6 @@ object Cell {
     )
     Cell(env)
   }
-
 }
 
 final case class Cell[+H](
@@ -22,9 +24,6 @@ final case class Cell[+H](
 ) extends AnyVal
   with HeaderInfo[Cell.Ctx[Any], Cell.Ctx[H]]
   with RowInfo[Cell.Ctx[Any], Cell.Ctx[H]] {
-//  override type Header = H
-//  override type EnvMin = Cell.Ctx[Any]
-//  override type Env = Cell.Ctx[H]
   override type Self[+env <: Cell.Ctx[Any]] = Cell[env]
 
   override protected def build[R <: Ctx[Any]](env: ZEnvironment[R]): Cell[R] =
@@ -37,10 +36,18 @@ final case class Cell[+H](
 
   def contentAs[A](implicit
     decoder: CellDecoder[A],
-  ): IO[DecodingFailure, A] = {
+  ): IO[CellDecodingFailure, A] = {
     CellDecoder[A]
       // provide the resolved cell context as the environment for the decoder
       // the remaining context must come from outside the cell (i.e. the header context)
       .decodeString(toEnv.get[CellCtx].content).provideEnvironment(toEnv)
   }
 }
+
+/**
+  * Details about a given [[Cell]] that is carried around in the [[ZEnvironment]] used by the cell.
+  *
+  * @param columnIndex the index of the current cell
+  * @param content the raw content of the current cell
+  */
+final case class CellCtx(columnIndex: Int, content: String)

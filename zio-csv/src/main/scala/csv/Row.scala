@@ -1,82 +1,36 @@
 package zio
 package csv
 
-import scala.util.control.NonFatal
-
-// TODO: Move to separate files or move Cell to here?
-
-private[csv] object CsvEnv {
-
-  def getOption[T : Tag](env: ZEnvironment[Any]): Option[T] =
-    Unsafe.unsafe { implicit unsafe =>
-      try Some(env.unsafe.get(Tag[HeaderCtx].tag))
-      catch {
-        case NonFatal(_) => None
-      }
-    }
-}
-
-private[csv] trait CsvEnv[EnvMin, +Env <: EnvMin] extends Any { self =>
-//  protected type EnvMin
-//  protected type Env <: EnvMin
-//  protected type Self[+env <: EnvMin] <: CsvEnv {
-//    type EnvMin = self.EnvMin
-//    type Env = env
-//  }
-
-  protected type Self[+env <: EnvMin] <: CsvEnv[EnvMin, env]
-
-  def toEnv: ZEnvironment[Env]
-
-  protected def build[R <: EnvMin](env: ZEnvironment[R]): Self[R]
-
-  protected def getOption[T : Tag]: Option[T] = CsvEnv.getOption[T](toEnv)
-}
-
-trait RowInfo[EnvMin <: RowCtx, +Env <: EnvMin]
-  extends Any with CsvEnv[EnvMin, Env] { self =>
-  override protected type Self[+env <: EnvMin] <: RowInfo[EnvMin, env]
-
-  def rowIndex: Long = toEnv.get[RowCtx].rowIndex
-}
-
-trait HeaderInfo[EnvMin, +Env <: EnvMin] extends Any with CsvEnv[EnvMin, Env] {
-//  override protected type Self[+env <: EnvMin] <: HeaderInfo {
-//    type EnvMin = self.EnvMin
-//    type Env <: env
-//
-  //  }
-
-  override protected type Self[+env <: EnvMin] <: HeaderInfo[EnvMin, env]
-
-  def headerContext[H >: Env](implicit
-    ev: H <:< HeaderCtx,
-    tag: Tag[H],
-  ): HeaderCtx =
-    ev(toEnv.get[H])
-
-  def optionalHeaderContext: Option[HeaderCtx] = getOption[HeaderCtx]
-
-  def addHeaderContext(headerCtx: HeaderCtx): Self[HeaderCtx with Env] =
-    build(toEnv.add[HeaderCtx](headerCtx))
-}
-
+/** A row with the minimum available context. With this type of row, you cannot lookup columns by name. */
 type AnyRow = Row[Any]
+
+/** A row from CSV data that has a header row. Used to lookup columns by name instead of just index. */
 type RowWithColNames = Row[HeaderCtx]
 
-final case class Row[+H](toEnv: ZEnvironment[H with RowCtx])
+/**
+  * The interface for operating on a given row of a CSV file.
+  * 
+  * @see [[CsvEnv]] for more details about this pattern of wrapping a [[ZEnvironment]]
+  * 
+  * @param toEnv the environment that contains the current context about the CSV data and current row that is being decoded.
+  */
+final case class Row[+H](toEnv: ZEnvironment[H & RowCtx])
   extends AnyVal
-  with HeaderInfo[RowCtx, H with RowCtx]
-  with RowInfo[RowCtx, H with RowCtx] {
-//  override protected type EnvMin = RowCtx
-//  override protected type Env = H with RowCtx
+  with HeaderInfo[RowCtx, H & RowCtx]
+  with RowInfo[RowCtx, H & RowCtx] {
   override protected type Self[+env <: RowCtx] = Row[env]
 
   override protected def build[NR <: RowCtx](env: ZEnvironment[NR]): Row[NR] =
     Row[NR](toEnv.prune[RowCtx].unionAll[NR](env))
 
+  /**
+    * @return the [[RowCtx]] of this row.
+    */
   def context: RowCtx = toEnv.get[RowCtx]
 
+  /**
+    * @return all the cells of this row, wrapped with the [[Cell]] interface.
+    */
   def cells: UIO[Chunk[Cell[H]]] = ZIO.succeed {
     val row = toEnv.get[RowCtx]
     row.cellContents.zipWithIndex.map { case (content, idx) =>
@@ -84,6 +38,9 @@ final case class Row[+H](toEnv: ZEnvironment[H with RowCtx])
     }
   }
 
+  /**
+    * @return a single cell of this row with the given index.
+    */
   def cell(idx: Int): IO[InvalidColumnIndex, Cell[H]] = cells.flatMap {
     cells =>
       // build an option of our cell
@@ -95,9 +52,16 @@ final case class Row[+H](toEnv: ZEnvironment[H with RowCtx])
       }
   }
 
+  /**
+    * Returns the column by name or fails with [[InvalidColumnIndex]] or [[InvalidColumnName]].
+    * 
+    * @param key the name of the column
+    * @param ev proof that this row has access to [[HeaderCtx]]
+    * @return a single cell of this row with the index associated with the given column name.
+    */
   def cell[C >: H : Tag](key: String)(implicit
     ev: C <:< HeaderCtx,
-  ): IO[DecodingFailure, Cell[H]] =
+  ): IO[InvalidColumnName | InvalidColumnIndex, Cell[H]] =
     for {
       // grab the header context so we can look up the column index by name
       // get the column index or fail
@@ -110,6 +74,11 @@ final case class Row[+H](toEnv: ZEnvironment[H with RowCtx])
       cellCtx <- cell(colIdx)
     } yield cellCtx
 
+  /**
+    * Read a cell and decode it as the given type.
+    * 
+    * @see [[Row.GetAsPartiallyApplied]] for how to apply the cell selector (by name or index).
+    */
   def cellAs[T]: Row.GetAsPartiallyApplied[H, T] =
     new Row.GetAsPartiallyApplied[H, T](toEnv)
 }
@@ -117,18 +86,33 @@ final case class Row[+H](toEnv: ZEnvironment[H with RowCtx])
 object Row {
 
   class GetAsPartiallyApplied[+H, T] private[Row] (
-    private val env: ZEnvironment[H with RowCtx],
+    private val env: ZEnvironment[H & RowCtx],
   ) extends AnyVal {
 
+    /**
+      * Select a given cell by index and decode as the partially applied type [[T]].
+      *
+      * @param idx the index of the current row to read
+      * @param decoder the [[CellDecoder]] to apply to the row (if it is not an invalid column index)
+      * @return a ZIO of either a [[DecodingFailure]]
+      */
     def apply(idx: Int)(implicit
       decoder: CellDecoder[T],
-    ): IO[DecodingFailure, T] =
+    ): IO[InvalidColumnIndex | CellDecodingFailure, T] =
       Row(env).cell(idx).flatMap(_.contentAs[T])
 
     def apply[C >: H : Tag](key: String)(implicit
       decoder: CellDecoder[T],
       ev: C <:< HeaderCtx,
-    ): IO[DecodingFailure, T] =
+    ): IO[InvalidColumnName | InvalidColumnIndex | CellDecodingFailure, T] =
       Row(env).cell[C](key).flatMap(_.contentAs[T])
   }
 }
+
+/**
+  * Context about the current row carried around in the [[ZEnvironment]] of the [[RowDecoder]].
+  *
+  * @param rowIndex the index of the current row
+  * @param cellContents the raw contents of the row as parsed
+  */
+final case class RowCtx(rowIndex: Long, cellContents: Chunk[String])
