@@ -12,6 +12,7 @@ object Dependencies {
   final private val disciplineVersion = "1.5.1"
   final private val doobieVersion = "1.0.0-RC2"
   final private val enumeratumVersion = "1.7.0"
+  final private val libPhoneNumberVersion = "8.13.1"
   final private val munitVersion = "0.7.29"
   final private val munitDisciplineVersion = "1.0.9"
   final private val refinedVersion = "0.10.1"
@@ -31,6 +32,7 @@ object Dependencies {
   private val catsEffect = "org.typelevel" %% "cats-effect" % catsEffectVersion
   private val discipline =
     "org.typelevel" %% "discipline-core" % disciplineVersion
+  private val libPhoneNumber = "com.googlecode.libphonenumber" % "libphonenumber" % libPhoneNumberVersion
   // TODO: Remove when code is moved out of this project (or if there is no interest in supporting this)
   // private val enumeratum = "com.beachape" %% "enumeratum" % enumeratumVersion
   private val munit = "org.scalameta" %% "munit" % munitVersion
@@ -108,6 +110,7 @@ object Dependencies {
 
   final val database = Deps(
     libraries = common.libraries ++ Seq(
+      libPhoneNumber,
       catsCore,
       catsEffect,
       refined,

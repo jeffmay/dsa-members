@@ -1,12 +1,12 @@
 package org.dsasf.members
 package jobs.national
 
-import database.models.national._
-import database.models.{Address, EmailAddress, NameComponentsUsa, PhoneNumber}
-import jobs.{national, CommonDecoders}
+import database.models.national.*
+import database.models.{Address, EmailAddress, NameComponentsUsa, PhoneNumber, PhoneNumberRegion}
+import jobs.{CommonDecoders, national}
 
-import zio._
-import zio.csv._
+import zio.*
+import zio.csv.*
 
 import java.time.LocalDate
 
@@ -29,6 +29,9 @@ final case class CsvRecord(
 )
 
 object CsvRecord extends CommonDecoders {
+
+  /** Default to USA for phone number region & country code */
+  given PhoneNumberRegion = PhoneNumberRegion.parseAndValidate("US").toTry.get
 
   object Keys {
     final val AK_ID = "AK_ID"

@@ -1,7 +1,7 @@
 package org.dsasf.members
 package jobs
 
-import database.models.{EmailAddress, PhoneNumber}
+import database.models.{EmailAddress, PhoneNumber, PhoneNumberRegion}
 
 import zio.ZIO
 import zio.csv.{CellDecoder, CellDecodingFailure}
@@ -22,15 +22,17 @@ trait CommonDecoders {
   //   EnumCodec[E].findByNameInsensitive(str)
   // }
 
-  implicit val decodePhoneNumber: CellDecoder[PhoneNumber] =
+  /** Decodes a single phone number using the default region from context. */
+  given decodePhoneNumber(using defaultRegion: PhoneNumberRegion): CellDecoder[PhoneNumber] =
     CellDecoder.fromEffect { content =>
-      PhoneNumber.parse(content).fold(
-        CellDecodingFailure.fromMessage(_).flip,
+      PhoneNumber.parseAndValidate(content, defaultRegion).fold(
+        ex => CellDecodingFailure.fromMessage(ex.getMessage).flip,
         ZIO.succeed(_),
       )
     }
 
-  implicit val decodeSeqPhoneNumber: CellDecoder[Seq[PhoneNumber]] =
+  /** Decodes a sequence of phone numbers (discarding invalid ones) using the default region from context. */
+  given decodeSeqPhoneNumber(using defaultRegion: PhoneNumberRegion): CellDecoder[Seq[PhoneNumber]] =
     CellDecoder.split(',').as[PhoneNumber].skipFailures.to(Vector)
 
   implicit val decodeEmailAddress: CellDecoder[EmailAddress] =
