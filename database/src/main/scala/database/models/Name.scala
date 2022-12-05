@@ -1,9 +1,13 @@
 package org.dsasf.members
 package database.models
 
-opaque type Name = String
-object Name {
-  def apply(value: String): Name = value
-}
+import io.getquill.MappedEncoding
+import io.getquill.generic.GenericDecoder
 
-extension (name: Name) inline def value: String = name
+final case class Name(value: String) extends AnyVal {
+  override def toString: String = value
+}
+object Name {
+  given MappedEncoding[Name, String] = MappedEncoding(_.value)
+  given MappedEncoding[String, Name] = MappedEncoding(Name(_))
+}

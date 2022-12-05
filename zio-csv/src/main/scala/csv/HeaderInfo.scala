@@ -18,8 +18,8 @@ trait HeaderInfo[EnvMin, +Env <: EnvMin] extends Any with CsvEnv[EnvMin, Env] {
 }
 
 /**
- * The header of the CSV file, carried around as a context parameter in the environment for [[CellWithHeader]]s to use.
- */
+  * The header row of the CSV file, carried around as a context parameter in the environment for [[RowWithColNames]]s to use.
+  */
 final case class HeaderCtx(headerRow: Chunk[String]) {
 
   lazy val columnIndexByName: Map[String, Int] =

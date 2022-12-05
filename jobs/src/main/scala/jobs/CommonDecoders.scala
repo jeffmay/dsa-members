@@ -1,7 +1,7 @@
 package org.dsasf.members
 package jobs
 
-import database.models.{EmailAddress, PhoneNumber, PhoneNumberRegion}
+import database.models.{EmailAddress, InputEmailAddress, PhoneNumber, PhoneNumberRegion}
 
 import zio.ZIO
 import zio.csv.{CellDecoder, CellDecodingFailure}
@@ -35,7 +35,7 @@ trait CommonDecoders {
   given decodeSeqPhoneNumber(using defaultRegion: PhoneNumberRegion): CellDecoder[Seq[PhoneNumber]] =
     CellDecoder.split(',').as[PhoneNumber].skipFailures.to(Vector)
 
-  implicit val decodeEmailAddress: CellDecoder[EmailAddress] =
+  given decodeEmailAddress: CellDecoder[EmailAddress] =
     CellDecoder.fromStringSafe { content =>
       require(
         content.nonEmpty,
@@ -64,11 +64,10 @@ trait CommonDecoders {
         !domain.contains('@'),
         s"EmailAddress domain '$domain' cannot contain an '@' symbol. First symbol found at index $firstAtSymbol.",
       )
-      // TODO: Validate domain with regex? Use refined?
-      EmailAddress(username, domain)
+      InputEmailAddress.parse(s"$username@$domain").fold(msg => throw new IllegalArgumentException(msg), identity)
     }
 
-  implicit val decodeLocalDate: CellDecoder[LocalDate] = {
+  given decodeLocalDate: CellDecoder[LocalDate] = {
     val dsaLocalDateTime = new DateTimeFormatterBuilder()
       .append(DateTimeFormatter.ISO_LOCAL_DATE)
       .optionalStart()

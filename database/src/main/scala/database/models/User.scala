@@ -3,31 +3,18 @@ package database.models
 
 import database.models.national.NationalMembershipRecord
 
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
+import io.getquill.{MappedEncoding, query, quote}
 import shapeless.tag.@@
+import zio.ZIO
 
+import java.util.UUID
 import scala.collection.mutable
 
-sealed trait BaseUserFields {
-  def fullName: Name
-  def nickNames: Set[Name]
-  def emailAddress: EmailAddress
-  def membershipRecords: Seq[NationalMembershipRecord]
-}
+// TODO: Move these to a models project
 
-sealed trait MemberFields extends BaseUserFields {
-  override def membershipRecords: Seq[NationalMembershipRecord] @@ NonEmpty
-  def latestMembership: NationalMembershipRecord
-}
+final case class UserId(toUuid: UUID) extends AnyVal with DbId
+object UserId extends DbIdCompanion[UserId]
 
-final case class Member(
-  fullName: Name,
-  nickNames: Set[Name],
-  emailAddress: EmailAddress,
-  membershipRecords: Seq[NationalMembershipRecord] @@ NonEmpty,
-) extends MemberFields {
-  override lazy val latestMembership: NationalMembershipRecord =
-    mutable.ArraySeq.from(membershipRecords)
-      .sortInPlace()
-      .head
-}
+final case class User(id: UserId, fullName: Name, primaryEmailAddress: EmailAddress)

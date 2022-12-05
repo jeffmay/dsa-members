@@ -4,6 +4,7 @@ package database.models
 import com.google.i18n.phonenumbers.PhoneNumberUtil.PhoneNumberFormat
 import com.google.i18n.phonenumbers.{NumberParseException, PhoneNumberUtil}
 import com.google.i18n.phonenumbers.Phonenumber
+import io.getquill.MappedEncoding
 import zio.Chunk
 
 import scala.util.Try
@@ -45,6 +46,10 @@ final case class PhoneNumber private (toGooglePhoneNumber: GooglePhoneNumber) ex
 }
 
 object PhoneNumber {
+
+  given mapPhoneNumberToString: MappedEncoding[PhoneNumber, String] = MappedEncoding(_.formatted)
+  given mapStringToPhoneNumber(using defaultRegion: PhoneNumberRegion): MappedEncoding[String, PhoneNumber] =
+    MappedEncoding(PhoneNumber.parseAndValidate(_, defaultRegion).toTry.get)
 
   type CountryCodeSource = Phonenumber.PhoneNumber.CountryCodeSource
   object CountryCodeSource {

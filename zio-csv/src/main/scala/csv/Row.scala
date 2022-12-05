@@ -94,13 +94,20 @@ object Row {
       *
       * @param idx the index of the current row to read
       * @param decoder the [[CellDecoder]] to apply to the row (if it is not an invalid column index)
-      * @return a ZIO of either a [[DecodingFailure]]
+      * @return a ZIO of either a [[DecodingFailure]] or the expected cell value
       */
     def apply(idx: Int)(implicit
       decoder: CellDecoder[T],
     ): IO[InvalidColumnIndex | CellDecodingFailure, T] =
       Row(env).cell(idx).flatMap(_.contentAs[T])
 
+    /**
+      * Select a given cell by column name and decode as the partially applied type [[T]].
+      *
+      * @param key the column name of the current row to read (based on the available [[HeaderCtx]])
+      * @param decoder the [[CellDecoder]] to apply to the row (if it is not an invalid column name or index)
+      * @return a ZIO of either a [[DecodingFailure]] or the expected cell value
+      */
     def apply[C >: H : Tag](key: String)(implicit
       decoder: CellDecoder[T],
       ev: C <:< HeaderCtx,

@@ -19,6 +19,7 @@ object Dependencies {
   final private val scalaCheckVersion = "1.17.0"
   final private val scalaCsvVersion = "1.3.10"
   final private val scalacticVersion = "3.2.14"
+  final private val quillVersion = "4.6.0"
   final private val zioVersion = "2.0.3"
   final private val zioCatsVersion = "3.3.0"
   final private val zioConfigVersion = "3.0.2"
@@ -42,6 +43,9 @@ object Dependencies {
   private val scalaCheck = "org.scalacheck" %% "scalacheck" % scalaCheckVersion
   private val scalaCsv = "com.github.tototoshi" %% "scala-csv" % scalaCsvVersion
   private val scalactic = "org.scalactic" %% "scalactic" % scalacticVersion
+  private val quillPostgresAsync =
+    "io.getquill" %% "quill-jasync-postgres" % quillVersion
+  private val quillZIO = "io.getquill" %% "quill-zio" % quillVersion
   private val zio = "dev.zio" %% "zio" % zioVersion
   private val zioCats = "dev.zio" %% "zio-interop-cats" % zioCatsVersion
   private val zioConfig = "dev.zio" %% "zio-config" % zioConfigVersion
@@ -113,6 +117,10 @@ object Dependencies {
       libPhoneNumber,
       catsCore,
       catsEffect,
+      quillPostgresAsync,
+      quillZIO,
+      // Add for Caliban Integration
+      // "io.getquill" %% "quill-caliban" % "4.5.0",
       refined,
       zioCats,
     ),

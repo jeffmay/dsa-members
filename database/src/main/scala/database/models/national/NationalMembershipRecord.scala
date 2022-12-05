@@ -1,17 +1,32 @@
 package org.dsasf.members
 package database.models.national
 
-import database.models.{Address, Name, PhoneNumber}
+import database.models.{Address, EmailAddress, Name, PhoneNumber, User, UserId}
+
+import io.getquill.MappedEncoding
 
 import java.time.LocalDate
 
-case class NationalMembershipRecord(
-  id: NationalMembershipRecord.Id,
+opaque type NationalMembershipRecordId = Int
+
+implicit object NationalMembershipRecordId extends Conversion[NationalMembershipRecordId, NationalMembershipRecordIdOps] {
+  inline def fromInt(inline value: Int): NationalMembershipRecordId = value
+
+  override def apply(id: NationalMembershipRecordId): NationalMembershipRecordIdOps = NationalMembershipRecordIdOps(id)
+}
+
+final class NationalMembershipRecordIdOps(val value: Int) extends AnyVal
+
+
+final case class NationalMembershipRecord(
+  id: NationalMembershipRecordId,
+  userId: Option[UserId],
   akId: AkID,
   name: Name,
   billingAddress: Address,
   mailingAddress: Address,
-  phoneNumbers: Set[PhoneNumber],
+  emailAddress: Option[EmailAddress],
+  phoneNumbers: Seq[PhoneNumber],
   mailPreference: MailPreference,
   doNotCall: Boolean,
   joinDate: LocalDate,
@@ -23,12 +38,8 @@ case class NationalMembershipRecord(
 
 object NationalMembershipRecord {
 
-  opaque type Id = Int
-  object Id {
-    def apply(value: Int): Id = value
-  }
-
-  extension (id: Id) inline def value: Int = id
-
   given naturalOrder: Ordering[NationalMembershipRecord] = Ordering.by(_.id.value)
+
+  given MappedEncoding[NationalMembershipRecordId, Int] = MappedEncoding(_.value)
+  given MappedEncoding[Int, NationalMembershipRecordId] = MappedEncoding(NationalMembershipRecordId.fromInt(_))
 }

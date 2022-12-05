@@ -1,2 +1,4 @@
 -J--add-opens=java.base/java.util=ALL-UNNAMED
 -J--add-opens=java.base/java.lang=ALL-UNNAMED
+-Dquill.log.file=queries.sql
+-Dquill.macro.log.pretty=true
