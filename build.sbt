@@ -39,8 +39,8 @@ lazy val csv = commonLibrary("zio-csv", Dependencies.csv, "zio")
 //  .dependsOn(enumeratumOps)
 
 // lazy val csvInteropCats =
-  // commonLibrary("zio-csv-interop-cats", Dependencies.csvInteropCats, "zio")
-    // .dependsOn(csv)
+// commonLibrary("zio-csv-interop-cats", Dependencies.csvInteropCats, "zio")
+// .dependsOn(csv)
 
 // TODO: Remove after upgrade to Scala 3
 // lazy val enumeratumOps =
@@ -77,7 +77,16 @@ lazy val api = commonProject("api", Dependencies.api)
   .dependsOn(database)
 
 lazy val database = commonProject("database", Dependencies.database)
-//  .dependsOn(enumeratumOps)
+  .dependsOn(
+    databaseCommon,
+    models,
+  )
+
+lazy val databaseCommon =
+  commonProject("database-common", Dependencies.databaseCommon)
+
+lazy val models =
+  commonProject("models", Dependencies.models)
 
 lazy val jobs = commonProject("jobs", Dependencies.jobs)
   .dependsOn(

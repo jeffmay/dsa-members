@@ -1,14 +1,15 @@
 package org.dsasf.members
 package database.queries
 
-import database.models.national.NationalMembershipRecord
-import database.models.{User, UserId}
+import database.common.DefaultNamingStrategy
+import models.national.NationalMembershipRecord
+import models.{User, UserId}
 
 import io.getquill.*
 
 import java.util.UUID
 
-class UserQueries(ctx: PostgresJAsyncContext[SnakeCaseWithPluralTableNames]) {
+class UserQueries(ctx: PostgresJAsyncContext[DefaultNamingStrategy]) {
   import ctx.*
 
   inline def create(inline user: User) = quote {

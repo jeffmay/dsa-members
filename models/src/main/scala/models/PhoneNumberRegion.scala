@@ -1,5 +1,5 @@
 package org.dsasf.members
-package database.models
+package models
 
 import com.google.i18n.phonenumbers.PhoneNumberUtil
 

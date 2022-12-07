@@ -33,7 +33,8 @@ object Dependencies {
   private val catsEffect = "org.typelevel" %% "cats-effect" % catsEffectVersion
   private val discipline =
     "org.typelevel" %% "discipline-core" % disciplineVersion
-  private val libPhoneNumber = "com.googlecode.libphonenumber" % "libphonenumber" % libPhoneNumberVersion
+  private val libPhoneNumber =
+    "com.googlecode.libphonenumber" % "libphonenumber" % libPhoneNumberVersion
   // TODO: Remove when code is moved out of this project (or if there is no interest in supporting this)
   // private val enumeratum = "com.beachape" %% "enumeratum" % enumeratumVersion
   private val munit = "org.scalameta" %% "munit" % munitVersion
@@ -45,6 +46,7 @@ object Dependencies {
   private val scalactic = "org.scalactic" %% "scalactic" % scalacticVersion
   private val quillPostgresAsync =
     "io.getquill" %% "quill-jasync-postgres" % quillVersion
+  private val quillEngine = "io.getquill" %% "quill-engine" % quillVersion
   private val quillZIO = "io.getquill" %% "quill-zio" % quillVersion
   private val zio = "dev.zio" %% "zio" % zioVersion
   private val zioCats = "dev.zio" %% "zio-interop-cats" % zioCatsVersion
@@ -114,7 +116,6 @@ object Dependencies {
 
   final val database = Deps(
     libraries = common.libraries ++ Seq(
-      libPhoneNumber,
       catsCore,
       catsEffect,
       quillPostgresAsync,
@@ -126,10 +127,25 @@ object Dependencies {
     ),
   )
 
+  final val databaseCommon = Deps(
+    libraries = Seq(
+      quillEngine,
+      zio,
+    ),
+  )
+
   final val jobs = Deps(
     libraries = common.libraries ++ Seq(
       scalactic,
       zioStreams,
+    ),
+  )
+
+  final val models = Deps(
+    libraries = Seq(
+      libPhoneNumber,
+      refined,
+      zio,
     ),
   )
 }

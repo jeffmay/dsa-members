@@ -1,5 +1,5 @@
 package org.dsasf.members
-package database.models.national
+package models.national
 
 enum MembershipStatus(val value: String):
   case Member extends MembershipStatus("member")

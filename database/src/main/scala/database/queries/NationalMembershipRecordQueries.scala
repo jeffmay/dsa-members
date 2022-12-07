@@ -1,12 +1,15 @@
 package org.dsasf.members
 package database.queries
 
-import database.models.{User, UserId}
-import database.models.national.*
+import database.common.DefaultNamingStrategy
+import models.national.*
+import models.{User, UserId}
 
 import io.getquill.*
 
-class NationalMembershipRecordQueries(ctx: PostgresJAsyncContext[SnakeCaseWithPluralTableNames]) {
+class NationalMembershipRecordQueries(
+  ctx: PostgresJAsyncContext[DefaultNamingStrategy],
+) {
   import ctx.*
 
   inline def findByUserId(inline userId: UserId) = quote {

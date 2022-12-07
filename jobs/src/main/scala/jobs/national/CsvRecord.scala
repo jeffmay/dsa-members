@@ -1,9 +1,9 @@
 package org.dsasf.members
 package jobs.national
 
-import database.models.national.*
-import database.models.{Address, EmailAddress, NameComponentsUsa, PhoneNumber, PhoneNumberRegion}
-import jobs.{CommonDecoders, national}
+import jobs.{national, CommonDecoders}
+import models.national.*
+import models.*
 
 import zio.*
 import zio.csv.*

@@ -1,5 +1,5 @@
 package org.dsasf.members
-package database.models.national
+package models.national
 
 enum MonthlyDuesStatus(val value: String):
   case Active extends MonthlyDuesStatus("active")

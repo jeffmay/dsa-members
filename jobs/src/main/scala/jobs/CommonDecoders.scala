@@ -1,7 +1,7 @@
 package org.dsasf.members
 package jobs
 
-import database.models.{EmailAddress, InputEmailAddress, PhoneNumber, PhoneNumberRegion}
+import models.*
 
 import zio.ZIO
 import zio.csv.{CellDecoder, CellDecodingFailure}
@@ -23,7 +23,9 @@ trait CommonDecoders {
   // }
 
   /** Decodes a single phone number using the default region from context. */
-  given decodePhoneNumber(using defaultRegion: PhoneNumberRegion): CellDecoder[PhoneNumber] =
+  given decodePhoneNumber(using
+    defaultRegion: PhoneNumberRegion,
+  ): CellDecoder[PhoneNumber] =
     CellDecoder.fromEffect { content =>
       PhoneNumber.parseAndValidate(content, defaultRegion).fold(
         ex => CellDecodingFailure.fromMessage(ex.getMessage).flip,
@@ -31,8 +33,12 @@ trait CommonDecoders {
       )
     }
 
-  /** Decodes a sequence of phone numbers (discarding invalid ones) using the default region from context. */
-  given decodeSeqPhoneNumber(using defaultRegion: PhoneNumberRegion): CellDecoder[Seq[PhoneNumber]] =
+  /** Decodes a sequence of phone numbers (discarding invalid ones) using the
+    * default region from context.
+    */
+  given decodeSeqPhoneNumber(using
+    defaultRegion: PhoneNumberRegion,
+  ): CellDecoder[Seq[PhoneNumber]] =
     CellDecoder.split(',').as[PhoneNumber].skipFailures.to(Vector)
 
   given decodeEmailAddress: CellDecoder[EmailAddress] =
@@ -64,7 +70,10 @@ trait CommonDecoders {
         !domain.contains('@'),
         s"EmailAddress domain '$domain' cannot contain an '@' symbol. First symbol found at index $firstAtSymbol.",
       )
-      InputEmailAddress.parse(s"$username@$domain").fold(msg => throw new IllegalArgumentException(msg), identity)
+      InputEmailAddress.parse(s"$username@$domain").fold(
+        msg => throw new IllegalArgumentException(msg),
+        identity,
+      )
     }
 
   given decodeLocalDate: CellDecoder[LocalDate] = {

@@ -1,24 +1,24 @@
 package org.dsasf.members
-package stringutil
+package util
 
 import zio.Chunk
 
 import scala.collection.mutable.ArrayBuffer
 
-final case class Diff private (
+final case class StringDiff private (
   left: String,
   right: String,
-  parts: Chunk[Diff.Part],
+  parts: Chunk[StringDiff.Part],
 ) {
 
   def isSame: Boolean =
-    parts.length == 1 && parts(0).isInstanceOf[Diff.Part.Same]
+    parts.length == 1 && parts(0).isInstanceOf[StringDiff.Part.Same]
 
   def firstDiff: Option[(Int, String, String)] =
     // NOTE: this only works if the sequence of parts is [Different,] Same, Different, Same, ...
     parts.zipWithIndex.collectFirst {
       case (
-            Diff.Part.Different(leftChunk, leftStart, rightChunk, rightStart),
+            StringDiff.Part.Different(leftChunk, leftStart, rightChunk, rightStart),
             idx,
           ) =>
         val prev3 = Option.unless(idx == 0) {
@@ -47,9 +47,9 @@ final case class Diff private (
     }
 }
 
-object Diff {
+object StringDiff {
 
-  def apply(left: String, right: String): Diff = {
+  def apply(left: String, right: String): StringDiff = {
     val lChars = Chunk.fromArray(left.toCharArray)
     val rChars = Chunk.fromArray(right.toCharArray)
     val b = Chunk.newBuilder[Part]
@@ -94,7 +94,7 @@ object Diff {
         rStart,
       )
     }
-    Diff(left, right, b.result())
+    StringDiff(left, right, b.result())
   }
 
   enum Part(

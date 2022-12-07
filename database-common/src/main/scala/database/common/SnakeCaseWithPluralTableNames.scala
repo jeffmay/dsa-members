@@ -1,11 +1,11 @@
 package org.dsasf.members
-package database.queries
+package database.common
 
 import io.getquill.{NamingStrategy, PluralizedTableNames, SnakeCase}
 
-// TODO: Move somewhere better
 object SnakeCaseWithPluralTableNames extends SnakeCaseWithPluralTableNames
-trait SnakeCaseWithPluralTableNames extends SnakeCase with PluralizedTableNames {
+trait SnakeCaseWithPluralTableNames
+  extends SnakeCase with PluralizedTableNames {
   override def default(s: String): String = SnakeCase.default(s)
   override def table(s: String): String = {
     // Ignore the pluralized table names implementation because its implementation is incorrect

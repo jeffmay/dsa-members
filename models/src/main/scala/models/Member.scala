@@ -1,7 +1,7 @@
 package org.dsasf.members
-package database.models
+package models
 
-import database.models.national.NationalMembershipRecord
+import national.NationalMembershipRecord
 
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty

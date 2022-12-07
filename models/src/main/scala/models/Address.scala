@@ -1,5 +1,5 @@
 package org.dsasf.members
-package database.models
+package models
 
 final case class Address(
   line1: String,

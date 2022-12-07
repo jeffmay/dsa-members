@@ -1,5 +1,5 @@
 package org.dsasf.members
-package database.models.national
+package models.national
 
 enum MembershipType(val value: String):
   case Monthly extends MembershipType("monthly")
