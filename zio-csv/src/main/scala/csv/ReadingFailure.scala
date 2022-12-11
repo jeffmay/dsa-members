@@ -1,41 +1,66 @@
 package zio
 package csv
 
+import com.github.tototoshi.csv.MalformedCSVException
+
+import java.io.IOException
 import scala.util.control.NoStackTrace
 import scala.util.matching.Regex
 
 /** An error during parsing or decoding a CSV.
   *
-  * Typically, this is returned and handled through a typed error channel, however, it can be throw as well.
+  * Typically, this is returned and handled through a typed error channel,
+  * however, it can be throw as well.
   *
-  * @note this extends [[Product]] so that all subclasses must define [[Equals]] properly.
+  * @note
+  *   this extends [[Product]] so that all subclasses must define [[Equals]]
+  *   properly.
   */
 sealed trait ReadingFailure extends Exception with Product with NoStackTrace
 
+/** An [[IOException]] was caught from an underlying library while reading from
+  * the stream.
+  * @see
+  *   [[ReadingFailure]]
+  */
+final case class ReadingIOException(cause: IOException)
+  extends Exception(
+    s"Reading from the stream failed due to an IOException: $cause",
+    cause,
+  )
+  with ReadingFailure
+
 /** An error while parsing a chunk of bytes into CSV rows.
-  * @see [[ReadingFailure]]
+  * @see
+  *   [[ReadingFailure]]
   */
 sealed trait ParsingFailure extends ReadingFailure
 
 /** An exception was caught from an underlying library while parsing.
-  * @see [[ReadingFailure]]
+  * @see
+  *   [[ReadingFailure]]
   */
-final case class ParsingException(cause: Throwable)
+final case class ParsingException(cause: MalformedCSVException)
   extends Exception(
     s"Parsing failed due to exception: $cause",
     cause,
   )
   with ParsingFailure
 
+final case class CombinedRowParsingFailures(failures: IndexedSeq[RowFailure])
+  extends Exception() with ParsingFailure
+
 /** An error while parsing or decoding a row of a CSV.
-  * @see [[ReadingFailure]]
+  * @see
+  *   [[ReadingFailure]]
   */
 sealed trait RowFailure extends ReadingFailure {
   def rowIndex: Long
 }
 
 /** An error while parsing a row of a CSV.
-  * @see [[ReadingFailure]]
+  * @see
+  *   [[ReadingFailure]]
   */
 sealed abstract class RowParsingFailure(
   override val rowIndex: Long,
@@ -46,7 +71,8 @@ sealed abstract class RowParsingFailure(
   with ParsingFailure
 
 /** The given line of text cannot be parsed using the expected CSV format.
-  * @see [[ReadingFailure]]
+  * @see
+  *   [[ReadingFailure]]
   */
 final case class RowInvalidSyntax(
   override val rowIndex: Long,
@@ -59,7 +85,8 @@ final case class RowInvalidSyntax(
   )
 
 /** An error while decoding a row of a CSV into an expected type.
-  * @see [[ReadingFailure]]
+  * @see
+  *   [[ReadingFailure]]
   */
 sealed abstract class DecodingFailure(
   override val rowIndex: Long,
@@ -77,8 +104,15 @@ sealed abstract class DecodingFailure(
   )
   with RowFailure
 
-/** An error caused by attempting to reference a column by a name that does not exist in the [[HeaderCtx]].
-  * @see [[ReadingFailure]]
+sealed trait MissingHeaderFailure extends DecodingFailure
+case object MissingHeaderFailure
+  extends DecodingFailure(0, None, None, "Missing header row", None)
+  with MissingHeaderFailure
+
+/** An error caused by attempting to reference a column by a name that does not
+  * exist in the [[HeaderCtx]].
+  * @see
+  *   [[ReadingFailure]]
   */
 final case class InvalidColumnName(
   override val rowIndex: Long,
@@ -91,8 +125,10 @@ final case class InvalidColumnName(
     None,
   )
 
-/** An error caused by attempting to reference a column by an index that does not exist in the [[RowCtx]].
-  * @see [[ReadingFailure]]
+/** An error caused by attempting to reference a column by an index that does
+  * not exist in the [[RowCtx]].
+  * @see
+  *   [[ReadingFailure]]
   */
 final case class InvalidColumnIndex(
   override val rowIndex: Long,
@@ -105,8 +141,10 @@ final case class InvalidColumnIndex(
     None,
   )
 
-/** An error caused by attempting to decode the contents of a [[Cell]] into the expected result type.
-  * @see [[ReadingFailure]]
+/** An error caused by attempting to decode the contents of a [[Cell]] into the
+  * expected result type.
+  * @see
+  *   [[ReadingFailure]]
   */
 sealed trait CellDecodingFailure extends DecodingFailure {
   def columnIndex: Int
@@ -129,7 +167,9 @@ object CellDecodingFailure {
       ),
     )
 
-  /** Create [[CellDecodingFailure]] without a known type using the [[CellDecoder.MinCtx]] and the given message. */
+  /** Create [[CellDecodingFailure]] without a known type using the
+    * [[CellDecoder.MinCtx]] and the given message.
+    */
   def fromMessage(
     reason: String,
   ): URIO[CellDecoder.MinCtx, CellDecodingFailure] = {
@@ -138,7 +178,9 @@ object CellDecodingFailure {
     }
   }
 
-  /** Convert an exception into a [[CellDecodingException]] of a given type using the [[CellDecoder.MinCtx]]. */
+  /** Convert an exception into a [[CellDecodingException]] of a given type
+    * using the [[CellDecoder.MinCtx]].
+    */
   def fromExceptionDecodingAs[A : Tag](
     cause: Throwable,
   ): URIO[CellDecoder.MinCtx, CellDecodingTypedFailure[A]] =
@@ -147,13 +189,16 @@ object CellDecodingFailure {
     }
 }
 
-/** A generic error occurred while decoding a [[Cell]] into some expected result.
+/** A generic error occurred while decoding a [[Cell]] into some expected
+  * result.
   *
-  * @note this can be used by other libraries for defining custom error messages
-  *       that do not require any expected type information. If you have the type
-  *       [[Tag]], then you should use some [[CellDecodingTypedFailure]] instead.
+  * @note
+  *   this can be used by other libraries for defining custom error messages
+  *   that do not require any expected type information. If you have the type
+  *   [[Tag]], then you should use some [[CellDecodingTypedFailure]] instead.
   *
-  * @see [[ReadingFailure]]
+  * @see
+  *   [[ReadingFailure]]
   */
 final case class GenericCellDecodingFailure(
   override val rowIndex: Long,
@@ -169,8 +214,7 @@ final case class GenericCellDecodingFailure(
   )
   with CellDecodingFailure
 
-/**
-  */
+/** */
 final case class CombinedCellDecodingFailure(
   override val rowIndex: Long,
   columnIndex: Int,
@@ -189,15 +233,18 @@ final case class CombinedCellDecodingFailure(
   with CellDecodingFailure
 
 /** A [[CellDecodingFailure]] with a known expected type.
-  * @see [[ReadingFailure]]
+  * @see
+  *   [[ReadingFailure]]
   */
 sealed trait CellDecodingTypedFailure[A] extends CellDecodingFailure {
   def expectedType: Tag[A]
   def withNewExpectedType[B : Tag]: CellDecodingTypedFailure[B]
 }
 
-/** An exception was caught while attempting to decode a [[Cell]] into an expected type.
-  * @see [[ReadingFailure]]
+/** An exception was caught while attempting to decode a [[Cell]] into an
+  * expected type.
+  * @see
+  *   [[ReadingFailure]]
   */
 final case class CellDecodingException[A : Tag](
   override val rowIndex: Long,
@@ -222,9 +269,11 @@ final case class CellDecodingException[A : Tag](
 
 /** The given [[Cell]] content did not match the [[expectedPattern]].
   *
-  * The [[patternType]] determines the language of the pattern (ex. "regular expression").
+  * The [[patternType]] determines the language of the pattern (ex. "regular
+  * expression").
   *
-  * @see [[ReadingFailure]]
+  * @see
+  *   [[ReadingFailure]]
   */
 sealed abstract class CellInvalidFormat[A : Tag](
   rowIndex: Long,
@@ -247,8 +296,10 @@ object CellInvalidFormat {
   final val RegexPatternType = "regular expression"
 }
 
-/** The given [[Cell]] content did not match the expected regular expression pattern.
-  * @see [[ReadingFailure]]
+/** The given [[Cell]] content did not match the expected regular expression
+  * pattern.
+  * @see
+  *   [[ReadingFailure]]
   */
 final case class CellInvalidUnmatchedRegex[A : Tag](
   override val rowIndex: Long,

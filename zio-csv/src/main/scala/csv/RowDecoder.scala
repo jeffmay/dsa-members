@@ -1,10 +1,16 @@
 package zio
 package csv
 
+import scala.annotation.implicitNotFound
+
 // TODO: Accumulate errors in row result
 
-trait RowDecoder[-R, +A] {
-  def decode(row: Row[R]): RowDecoder.Result[A]
+@implicitNotFound(
+  "Cannot find a decoder for ${A} that supports Row[${H}].\n\n" +
+    "Maybe you need to parse the header row first or add some additional context to the rows?",
+)
+trait RowDecoder[-H, +A] {
+  def decode(row: Row[H]): RowDecoder.Result[A]
 }
 
 object RowDecoder {
@@ -18,11 +24,11 @@ object RowDecoder {
     inline def apply[A : FromHeaderInfo]: FromHeaderInfo[A] = implicitly
   }
 
-  /** Build a [[RowDecoder]] with a given function, rather than rely on converting
-    * from a single abstract method (SAM).
+  /** Build a [[RowDecoder]] with a given function, rather than rely on
+    * converting from a single abstract method (SAM).
     *
-    * This is helpful for getting better compiler error messages when variance would
-    * make your row or result type not match the expected return type.
+    * This is helpful for getting better compiler error messages when variance
+    * would make your row or result type not match the expected return type.
     */
   def build[R, A : Tag](
     decoder: Row[R] => RowDecoder.Result[A],

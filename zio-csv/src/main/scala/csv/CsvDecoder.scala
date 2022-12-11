@@ -15,7 +15,12 @@ object CsvDecoder {
     rows.peel(ZSink.head[Row[Any]]).map { case (maybeHead, tail) =>
       maybeHead.map { firstRow =>
         val ctx = HeaderCtx(firstRow.context.cellContents)
-        tail.map(_.addHeaderContext(ctx))
+        tail.map(_.mapContext { c =>
+          c.copy(
+            // remove the header row from the row index
+            rowIndex = c.rowIndex - 1,
+          )
+        }.addHeaderContext(ctx))
       }
     }
   }
@@ -48,6 +53,15 @@ sealed trait DecodeRowsAs[+E <: RowFailure, A, +T] extends Any {
     result: RowDecoder.Result[A],
   ): ZIO[R, E, T]
 
+  def apply[R, E1 >: E, H](
+    rows: ZStream[R, E1, Row[H]],
+  )(using decoder: RowDecoder[H, A]): ZStream[R, E1, T] = {
+    rows.mapZIO { row =>
+      wrapResult(decoder.decode(row))
+    }
+  }
+
+  // TODO: Is this needed? I think contravariance should handle this case.
   def usingPositionOnly[R, E1 >: E](
     rows: ZStream[R, E1, Row[Any]],
   )(implicit decoder: RowDecoder.FromPositionOnly[A]): ZStream[R, E1, T] = {
@@ -56,21 +70,21 @@ sealed trait DecodeRowsAs[+E <: RowFailure, A, +T] extends Any {
     }
   }
 
-  // TODO: Convert this to a ZPipeline
-  // TODO: Should this require a scope? or provide one locally?
   def usingHeaderInfo[R, E1 >: RowFailure](
     rows: ZStream[R, E1, Row[Any]],
-  )(implicit decoder: RowDecoder.FromHeaderInfo[A]): ZStream[R with Scope, E1, T] = {
+  )(implicit
+    decoder: RowDecoder.FromHeaderInfo[A],
+  ): ZStream[R, E1, T] = {
     val readHeaderThenAllRows = CsvDecoder.readHeaderInfo(rows).map {
       case Some(rows) =>
         rows.mapZIO { row =>
           wrapResult(decoder.decode(row))
         }
       case None =>
-        ZStream.empty
+        ZStream.fail(MissingHeaderFailure)
     }
     // flatten the ZManaged ZStream into a single ZStream
-    ZStream.scoped[R](readHeaderThenAllRows).flatten
+    ZStream.unwrapScoped[R](readHeaderThenAllRows)
   }
 
   def providedHeader[R, E1 >: E](

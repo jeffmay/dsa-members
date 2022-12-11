@@ -47,9 +47,9 @@ object ImportNationalMembership {
     path: Path,
     format: CSVFormat,
   ): UIO[ImportResults] = {
-    val reader = CsvParser.fromFile(path, format)
+    val reader = CsvParser.fromFileWithHeader(path, format)
     val decodeRecords = CsvDecoder
-      .decodeRowsAsEitherFailureOr[CsvRecord].usingHeaderInfo(reader)
+      .decodeRowsAsEitherFailureOr[CsvRecord](reader.collectRight)
       .catchAll(f => ZStream.succeed(Left(f))).provideLayer(Scope.default)
     decodeRecords.run {
       ZSink.foldLeft(ImportResults()) {
