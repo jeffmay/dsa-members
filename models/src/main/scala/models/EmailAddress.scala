@@ -20,9 +20,10 @@ sealed trait EmailAddress extends Any {
 }
 
 object EmailAddress {
-  // TODO: Use the official regex for emails
+
+  /** See https://stackoverflow.com/a/14075810/589581 */
   // language=RegExp
-  inline val ValidPattern = "[^@]+@[a-z.-]+"
+  inline val ValidPattern = "([-!#-'*+/-9=?A-Z^-~]+(\\.[-!#-'*+/-9=?A-Z^-~]+)*|\"(\\[]!#-[^-~ \\t]|(\\\\[\\t -~]))+\")@[0-9A-Za-z]([0-9A-Za-z-]{0,61}[0-9A-Za-z])?(\\.[0-9A-Za-z]([0-9A-Za-z-]{0,61}[0-9A-Za-z])?)+"
   type Valid = MatchesRegex[ValidPattern.type]
 
   inline def apply(fullAddress: String Refined Valid): EmailAddress = InputEmailAddress(fullAddress)

@@ -13,19 +13,7 @@ object RunJob extends ZIOAppDefault {
   private val sampleFile: Path = Paths.get("tmp", "dsasf-2021-03-21.csv")
 
   override val run: ZIO[Environment with ZIOAppArgs with Scope, Any, Any] = {
-//    val linesOfFile = ZStream.fromFile(sampleFile).transduce(
-//      ZTransducer.utfDecode >>> ZTransducer.splitLines,
-//    )
-//    val printAll = for ((line, idx) <- linesOfFile.zipWithIndex)
-//      console.putStrLn(s"Line ${idx + 1}: $line")
-
-//    for {
-//      _ <- printAll.orDie
-//    } yield ExitCode.success
     for {
-//      console <- ZIO.service[Console.Service]
-//      _ <- console.putStrLn("Hello. What file do you want to process?")
-//      filename <- console.getStrLn.orDie
       rs <- ImportNationalMembership.fromCsvFile(
         Paths.get(
           "tmp",
@@ -38,6 +26,5 @@ object RunJob extends ZIOAppDefault {
       )
     } yield ExitCode.success
   }
-
 
 }
