@@ -93,6 +93,7 @@ lazy val databaseCommon =
 
 lazy val models =
   commonProject("models", Dependencies.models)
+    .dependsOn(enumOps)
 
 lazy val jobs = commonProject("jobs", Dependencies.jobs)
   .dependsOn(

@@ -1,6 +1,8 @@
 package zio
 package csv
 
+import zio.util.EnumCompanion
+
 import java.time.{Instant, LocalDate, LocalDateTime, ZonedDateTime}
 import scala.collection.Factory
 import scala.collection.immutable.ArraySeq
@@ -265,18 +267,13 @@ object CellDecoder {
         s"CellDecoder.optional(${CellDecoder[A].toString})"
     }
 
-  // TODO: How to avoid Java reflection when handling enumerations
-  type EnumLike[V] = Singleton & {
-    def values: Array[V]
-  }
-
-  def enumeration[E <: EnumLike[V], V](
-    enumObject: E,
-  ): EnumPartiallyApplied[E, V] =
+  def enumeration(
+    enumObject: Singleton & EnumCompanion,
+  ): EnumPartiallyApplied[enumObject.EntryType] =
     new EnumPartiallyApplied(enumObject)
 
-  final class EnumPartiallyApplied[E <: EnumLike[V], V](
-    private val enumObject: E,
+  final class EnumPartiallyApplied[V](
+    private val enumObject: Singleton & EnumCompanion { type EntryType = V },
   ) extends AnyVal {
 
     def fromStringInsensitive(key: V => String)(implicit
@@ -286,17 +283,13 @@ object CellDecoder {
       private val enumShortName = clsTag.runtimeClass.getTypeName
 
       private val valuesByNameLowercase = {
-        val values = clsTag.runtimeClass.getEnumConstants
+        import reflect.Selectable.reflectiveSelectable
+        val values = enumObject.entries
         require(
           values.nonEmpty,
           s"Enum $enumShortName invalid. At least one enum case is required.",
         )
-        values.view.map {
-          case entry: V => key(entry).toLowerCase -> entry
-          case other => throw new IllegalStateException(
-              s"Expected enum value of $enumShortName, but found $other",
-            )
-        }.toMap
+        values.view.map(e => key(e).toLowerCase -> e).toMap
       }
 
       override def decodeString(content: String): ZIO[

@@ -1,6 +1,8 @@
 package org.dsasf.members
 package models.national
 
+import zio.util.EnumCompanionOf
+
 enum MonthlyDuesStatus(val value: String):
   case Active extends MonthlyDuesStatus("active")
   case Lapsed extends MonthlyDuesStatus("lapsed")
@@ -10,3 +12,5 @@ enum MonthlyDuesStatus(val value: String):
   case CanceledByProcessor extends MonthlyDuesStatus("canceled_by_processor")
   case CanceledByFailure extends MonthlyDuesStatus("canceled_by_failure")
   case Never extends MonthlyDuesStatus("never")
+
+object MonthlyDuesStatus extends EnumCompanionOf[MonthlyDuesStatus]
