@@ -36,6 +36,7 @@ def commonLibrary(
 }
 
 lazy val csv = commonLibrary("zio-csv", Dependencies.csv, "zio")
+  .dependsOn(enumOps)
 //  .dependsOn(enumeratumOps)
 
 // lazy val csvInteropCats =
@@ -46,6 +47,11 @@ lazy val csv = commonLibrary("zio-csv", Dependencies.csv, "zio")
 // lazy val enumeratumOps =
 //   commonLibrary("enumeratum-ops", Dependencies.enumeratumOps, "enumeratum")
 //     .settings(scalaVersion := "2.13.10")
+
+lazy val enumOps = commonLibrary("enum-ops", Dependencies.enumOps, "zio.util")
+  .settings(
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+  )
 
 def commonProject(
   id: String,

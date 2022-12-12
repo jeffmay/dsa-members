@@ -8,11 +8,12 @@ case class Deps(
 object Dependencies {
 
   final private val catsVersion = "2.9.0"
-  final private val catsEffectVersion = "3.4.0"
+  final private val catsEffectVersion = "3.4.1"
   final private val disciplineVersion = "1.5.1"
   final private val doobieVersion = "1.0.0-RC2"
   final private val enumeratumVersion = "1.7.0"
   final private val libPhoneNumberVersion = "8.13.1"
+  final private val magnoliaVersion = "1.2.0"
   final private val munitVersion = "0.7.29"
   final private val munitDisciplineVersion = "1.0.9"
   final private val refinedVersion = "0.10.1"
@@ -20,12 +21,12 @@ object Dependencies {
   final private val scalaCsvVersion = "1.3.10"
   final private val scalacticVersion = "3.2.14"
   final private val quillVersion = "4.6.0"
-  final private val zioVersion = "2.0.3"
+  final private val zioVersion = "2.0.5"
   final private val zioCatsVersion = "3.3.0"
   final private val zioConfigVersion = "3.0.2"
   final private val zioHttpVersion = "2.0.0-RC11"
   final private val zioJsonVersion = "0.3.0"
-  final private val zioLoggingVersion = "2.1.4"
+  final private val zioLoggingVersion = "2.1.5"
   final private val zioNioVersion = "2.0.0"
 
   private val catsCore = "org.typelevel" %% "cats-core" % catsVersion
@@ -35,6 +36,7 @@ object Dependencies {
     "org.typelevel" %% "discipline-core" % disciplineVersion
   private val libPhoneNumber =
     "com.googlecode.libphonenumber" % "libphonenumber" % libPhoneNumberVersion
+  private val magnolia = "com.softwaremill.magnolia1_3" %% "magnolia" % "1.2.0"
   // TODO: Remove when code is moved out of this project (or if there is no interest in supporting this)
   // private val enumeratum = "com.beachape" %% "enumeratum" % enumeratumVersion
   private val munit = "org.scalameta" %% "munit" % munitVersion
@@ -57,6 +59,9 @@ object Dependencies {
   private val zioJson = "dev.zio" %% "zio-json" % zioJsonVersion
   private val zioLogging = "dev.zio" %% "zio-logging" % zioLoggingVersion
   private val zioStreams = "dev.zio" %% "zio-streams" % zioVersion
+  private val zioTest = "dev.zio" %% "zio-test" % zioVersion
+  private val zioTestMagnolia = "dev.zio" %% "zio-test-magnolia" % zioVersion
+  private val zioTestSbt = "dev.zio" %% "zio-test-sbt" % zioVersion
 
   final private val common = Deps(
     libraries = Seq(
@@ -102,6 +107,16 @@ object Dependencies {
       discipline,
       munitDiscipline,
       scalaCheck,
+    ).map(_ % Test),
+  )
+
+  final val enumOps = Deps(
+    libraries = Seq(
+      magnolia,
+    ) ++ Seq(
+      zioTest,
+      zioTestMagnolia,
+      zioTestSbt,
     ).map(_ % Test),
   )
 
