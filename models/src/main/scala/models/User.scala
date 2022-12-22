@@ -7,6 +7,7 @@ import shapeless.tag.@@
 
 import java.util.UUID
 import scala.collection.mutable
+import zio.*
 
 final case class User(
   id: UserId,
@@ -17,5 +18,6 @@ final case class User(
 type UserId = UserId.UserIdValue
 object UserId:
   opaque type UserIdValue = UUID
-  inline def apply(inline id: UUID): UserIdValue = id
-  extension (inline id: UserIdValue) inline def value: UUID = id
+  inline def apply(inline id: UUID): UserId = id
+  inline def random: UIO[UserId] = Random.nextUUID
+  extension (inline id: UserId) inline def value: UUID = id

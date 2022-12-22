@@ -40,11 +40,11 @@ final class DecodeRowsAsOrFail[A](private val dummy: Boolean = true)
 }
 
 final class DecodeRowsAsEitherFailuresOr[A](private val dummy: Boolean = true)
-  extends AnyVal with DecodeRowsAs[Nothing, A, Either[RowFailure, A]] {
+  extends AnyVal with DecodeRowsAs[Nothing, A, Either[DecodingFailure, A]] {
 
   override protected def wrapResult[R](
     result: Result[A],
-  ): ZIO[R, Nothing, Either[RowFailure, A]] = result.either
+  ): ZIO[R, Nothing, Either[DecodingFailure, A]] = result.either
 }
 
 sealed trait DecodeRowsAs[+E <: RowFailure, A, +T] extends Any {

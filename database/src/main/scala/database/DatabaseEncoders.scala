@@ -62,9 +62,9 @@ trait DatabaseEncoders {
   ): MappedEncoding[String, PhoneNumber] =
     MappedEncoding(PhoneNumber.parseAndValidate(_, defaultRegion).toTry.get)
 
-  given MappedEncoding[NationalMembershipRecordId, Int] = MappedEncoding(_.value)
+  given MappedEncoding[NationalMembershipRecordId, UUID] = MappedEncoding(_.value)
 
-  given MappedEncoding[Int, NationalMembershipRecordId] =
+  given MappedEncoding[UUID, NationalMembershipRecordId] =
     MappedEncoding(NationalMembershipRecordId(_))
 
 }

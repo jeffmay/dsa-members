@@ -1,9 +1,10 @@
 package zio
 package csv
 
-import com.github.tototoshi.csv.DefaultCSVFormat
+import com.github.tototoshi
 
+type CSVFormat = tototoshi.csv.CSVFormat
 object CsvFormat {
 
-  object Default extends DefaultCSVFormat
+  object Default extends tototoshi.csv.DefaultCSVFormat
 }

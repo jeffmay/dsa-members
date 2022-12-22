@@ -3,7 +3,10 @@ package models.national
 
 import models.*
 
+import zio.*
+
 import java.time.LocalDate
+import java.util.UUID
 
 final case class NationalMembershipRecord(
   id: NationalMembershipRecordId,
@@ -30,8 +33,11 @@ object NationalMembershipRecord {
 
 type NationalMembershipRecordId = NationalMembershipRecordId.NationalMembershipRecordIdValue
 object NationalMembershipRecordId {
-  opaque type NationalMembershipRecordIdValue = Int
+  opaque type NationalMembershipRecordIdValue = UUID
 
-  inline def apply(inline value: Int): NationalMembershipRecordId = value
-  extension (inline id: NationalMembershipRecordIdValue) inline def value: Int = id
+  inline def apply(inline value: UUID): NationalMembershipRecordId = value
+
+  inline def random: UIO[NationalMembershipRecordId] = Random.nextUUID
+
+  extension (inline id: NationalMembershipRecordId) inline def value: UUID = id
 }

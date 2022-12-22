@@ -12,6 +12,12 @@ import java.util.UUID
 class UserQueries(ctx: PostgresJAsyncContext[DefaultNamingStrategy]) {
   import ctx.*
 
+  inline def batchInsert(inline users: Seq[User]) = quote {
+    liftQuery(users).foreach { user =>
+      query[User].insertValue(user)
+    }
+  }
+
   inline def create(inline user: User) = quote {
     query[User].insertValue(user)
   }
